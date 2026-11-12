@@ -1,0 +1,33 @@
+/** @type {import('tailwindcss').Config} */
+// Colours are the Figma "Direction A x Brightech" tokens (00 · Foundations), exposed as CSS vars in src/index.css.
+const v = (n) => `var(--${n})`;
+export default {
+  content: ['./index.html', './src/**/*.{ts,tsx}'],
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['"IBM Plex Sans"', 'system-ui', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
+      },
+      colors: {
+        canvas: v('color-bg-canvas'), surface: v('color-bg-surface'), subtle: v('color-bg-subtle'),
+        inverse: v('color-bg-inverse'), 'inverse-raised': v('color-bg-inverse-raised'), disabled: v('color-bg-disabled'),
+        fg: { DEFAULT: v('color-text-primary'), 2: v('color-text-secondary'), muted: v('color-text-muted'),
+              inverse: v('color-text-inverse'), 'inverse-muted': v('color-text-inverse-muted'), disabled: v('color-text-disabled') },
+        line: { DEFAULT: v('color-border-default'), strong: v('color-border-strong'), focus: v('color-border-focus'), inverse: v('color-border-inverse') },
+        accent: { DEFAULT: v('color-accent-fill'), hover: v('color-accent-fill-hover') },
+        brand: { logo: v('color-brand-logo'), subtle: v('color-brand-subtle'), text: v('color-brand-text'), gear: v('color-brand-gear') },
+        warn: { fill: v('color-warning-fill'), bg: v('color-warning-bg'), fg: v('color-warning-fg'), border: v('color-warning-border') },
+        danger: v('color-feedback-danger-fill'), success: v('color-feedback-success-fill'),
+        st: {
+          'neutral-bg': v('color-status-neutral-bg'), 'neutral-fg': v('color-status-neutral-fg'), 'neutral-bd': v('color-status-neutral-border'),
+          'progress-bg': v('color-status-progress-bg'), 'progress-fg': v('color-status-progress-fg'), 'progress-bd': v('color-status-progress-border'),
+          'success-bg': v('color-status-success-bg'), 'success-fg': v('color-status-success-fg'), 'success-bd': v('color-status-success-border'),
+          'blocked-bg': v('color-status-blocked-bg'), 'blocked-fg': v('color-status-blocked-fg'), 'blocked-bd': v('color-status-blocked-border'),
+        },
+        company: { accent: v('company-accent'), subtle: v('company-subtle') },
+      },
+    },
+  },
+  plugins: [],
+};

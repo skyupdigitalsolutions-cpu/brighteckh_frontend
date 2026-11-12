@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Figma 00 · Foundations — light theme tokens. Company accent: BLR violet / CHN teal (only on the company indicator). */
+:root {
+  --color-bg-canvas: #eeeef0; --color-bg-surface: #ffffff; --color-bg-subtle: #f7f7f8;
+  --color-bg-inverse: #1c1c1e; --color-bg-inverse-raised: #2c2c2f; --color-bg-disabled: #eeeef0;
+  --color-text-primary: #111113; --color-text-secondary: #5a5a5f; --color-text-muted: #737378;
+  --color-text-inverse: #ffffff; --color-text-inverse-muted: #bebec4; --color-text-disabled: #94949a;
+  --color-border-default: #dcdce0; --color-border-strong: #94949a; --color-border-focus: #1f5fd1; --color-border-inverse: #434347;
+  --color-accent-fill: #c63e30; --color-accent-fill-hover: #a83327;
+  --color-brand-logo: #da4a3c; --color-brand-subtle: #fdf0ee; --color-brand-text: #84271e; --color-brand-gear: #737378;
+  --color-warning-fill: #f5a300; --color-warning-bg: #fff8e6; --color-warning-fg: #7a4d00; --color-warning-border: #d98c00;
+  --color-feedback-danger-fill: #b4234a; --color-feedback-success-fill: #1c7c4a;
+  --color-status-neutral-bg: #eeeef0; --color-status-neutral-fg: #434347; --color-status-neutral-border: #bebec4;
+  --color-status-progress-bg: #eaf2ff; --color-status-progress-fg: #123e8c; --color-status-progress-border: #b9d3ff;
+  --color-status-success-bg: #e8f6ee; --color-status-success-fg: #0f5131; --color-status-success-border: #a9dfc0;
+  --color-status-blocked-bg: #fcedf1; --color-status-blocked-fg: #7e1733; --color-status-blocked-border: #f2b8c7;
+  --company-accent: #5b4bc4; --company-subtle: #f0eefc;
+}
+:root[data-company="CHN"] { --company-accent: #0f7c7c; }
+
+html, body, #root { height: 100%; }
+body { @apply bg-canvas font-sans text-fg antialiased; }
+:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: 2px; }
