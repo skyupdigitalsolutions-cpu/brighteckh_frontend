@@ -35,7 +35,8 @@ export function FieldRow({ children }: { children: ReactNode }) {
 }
 
 const boxBase = 'flex h-[44px] w-full items-center gap-[8px] overflow-clip rounded-t-field border px-[14px]';
-const boxState = (error?: boolean, disabled?: boolean) => cx(
+/** The drawer field box (h-44, radius 12, bg-subtle, 1px border-strong, brand focus / danger error stroke). Exported for LookupPicker. */
+export const boxState = (error?: boolean, disabled?: boolean) => cx(
   boxBase,
   disabled ? 'border-line-strong bg-disabled text-fg-disabled' : 'border-line-strong bg-subtle',
   !disabled && 'focus-within:ring-inside-brand',

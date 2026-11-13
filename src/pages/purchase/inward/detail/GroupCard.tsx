@@ -3,40 +3,53 @@
 // Head: "Group n · <assembly>" Desktop/H2 18/24 + 14/20 secondary sub-line (gap 2).
 // Not expanded (177:108610): progress Inline alert "Expand to create unit records" · Store location* + Custodian*
 // pair (gap 14) · right-aligned primary "Expand into n units" (stack icon).
-//   POST /equipment-groups/{id}/expand { location_id, custodian_id }. G18: no custody-location lookup → UUID.
-//   Custodian defaults to the signed-in user (/auth/me id); no employee lookup (G17) to pick someone else by name.
+//   POST /equipment-groups/{id}/expand { location_id, custodian_id }. Store location = LookupPicker over
+//   custodyLocationSource; Custodian = LookupPicker over employeeSource() — any active employee of the company (the DB
+//   check in br02_expand_equipment_group requires only that, so no role filter is applied) — defaulting to the
+//   signed-in user.
 // Expanded (177:108664 / 177:103148): fan-out connector (2px border-strong lines, 36 high: trunk at x 24, bar at
 // y 18, a drop to the centre of each unit column; 8px dot on the trunk top in the frames that have verified units)
 // then unit cards (gap 16, radius 20, p-16, gap 12):
 //   PENDING  = brand-subtle fill + 2px dashed brand-border; job slot py-10 = primary "Verify unit" (camera), block.
 //   VERIFIED = surface + 1px border-default; job slot = subtle fill, radius 14, px-12 py-10, gap 10: tool icon,
 //              job_number (Data/ID, links to /p/jobs/:id) + 12/16 assignment line, job status badge.
-// G19: the group's assembly has no lookup → its id is shown (mono) instead of a name.
-// G?-B-2: GET /inward-receipts/{id} does not say which Job a verified unit got; jobs verified in this tab are
-// remembered (useUnitJobs), others show the gap.
+// Group title = assembly name (resolved once on the page via useAssembliesByIds). A verified unit's Job comes from the
+// receipt detail (equipment_units[].job_id / job_number); the assignment line names the engineer (useEngineersByIds).
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { IconCamera, IconStack2, IconTool, IconUserPlus } from '@tabler/icons-react';
 import {
-  Button, cx, FieldRow, FormErrors, GapNote, GlassCard, Ic, InlineAlert, StatusPill, TextInput,
+  Button, cx, FieldRow, FormErrors, GlassCard, Ic, InlineAlert, LookupPicker, StatusPill,
 } from '../../../../ui/desktop';
 import { enumLabel } from '../../../../lib/format';
 import { useAuth } from '../../../../auth/AuthProvider';
-import { useExpandGroup, useJob, type EquipmentGroup, type EquipmentUnit, type InwardReceipt } from '../../api';
-import { isUuid, shortId, type UnitJob } from './local';
+import {
+  custodyLocationSource, employeeSource, useEngineersByIds, useExpandGroup, useJob, type AssemblyLookupRow,
+  type EquipmentGroup, type InwardReceipt,
+} from '../../api';
+import { shortId } from './local';
+
+/** A unit row of the receipt detail (carries job_id / job_number). */
+export type ReceiptUnit = InwardReceipt['equipment_units'][number];
+export type UnitJob = { jobId: string; jobNumber: string };
+/** The Job created when the unit was verified (null before verification). */
+export const unitJob = (u: ReceiptUnit): UnitJob | null =>
+  u.job_id && u.job_number ? { jobId: u.job_id, jobNumber: u.job_number } : null;
 
 export const groupLabel = (g: EquipmentGroup) => `Group ${g.group_number}`;
+const CUSTODIANS = employeeSource();
 
-export function GroupCard({ receipt, group, units, jobs, canWork, fill, onVerify, onAssign }: {
+export function GroupCard({ receipt, group, assembly, units, canWork, fill, onVerify, onAssign }: {
   receipt: InwardReceipt;
   group: EquipmentGroup;
-  units: EquipmentUnit[];
-  jobs: Record<string, UnitJob>;
+  /** Resolved assembly row (undefined while it loads or if the lookup can't see it → short id shown). */
+  assembly?: AssemblyLookupRow;
+  units: ReceiptUnit[];
   canWork: boolean;
   /** Stretch to the page bottom (single-group layout of the frames). */
   fill?: boolean;
-  onVerify: (unit: EquipmentUnit, index: number) => void;
-  onAssign: (unit: EquipmentUnit, index: number, job: UnitJob) => void;
+  onVerify: (unit: ReceiptUnit, index: number) => void;
+  onAssign: (unit: ReceiptUnit, index: number, job: UnitJob) => void;
 }) {
   const expanded = units.length > 0;
   const dcLine = group.customer_dc_line ? ` · DC line ${group.customer_dc_line}` : '';
@@ -49,13 +62,15 @@ export function GroupCard({ receipt, group, units, jobs, canWork, fill, onVerify
       <div className="flex w-full items-center overflow-clip">
         <div className="flex min-w-0 flex-1 flex-col items-start gap-[2px] overflow-clip whitespace-nowrap">
           <p className="text-[18px] font-semibold leading-[24px] text-fg">
-            {groupLabel(group)} · <span className="font-mono text-[13px] font-medium leading-[18px]" title={group.assembly_id}>assembly {shortId(group.assembly_id)}</span>
+            {groupLabel(group)} · {assembly
+              ? <span title={assembly.assembly_code}>{assembly.assembly_name}</span>
+              : <span className="font-mono text-[13px] font-medium leading-[18px]" title={group.assembly_id}>assembly {shortId(group.assembly_id)}</span>}
           </p>
           <p className="text-[14px] leading-[20px] text-fg-2">{sub}</p>
         </div>
       </div>
       {expanded
-        ? <Units units={units} jobs={jobs} canWork={canWork} onVerify={onVerify} onAssign={onAssign} />
+        ? <Units units={units} canWork={canWork} onVerify={onVerify} onAssign={onAssign} />
         : canWork && <ExpandForm receiptId={receipt.id} group={group} />}
     </GlassCard>
   );
@@ -69,16 +84,16 @@ function ExpandForm({ receiptId, group }: { receiptId: string; group: EquipmentG
   const [touched, setTouched] = useState(false);
   const expand = useExpandGroup(receiptId);
   const errs = {
-    location: !location.trim() ? 'Enter the store location ID' : !isUuid(location) ? 'Location ID is a UUID' : null,
-    custodian: !custodian.trim() ? 'Enter the custodian ID' : !isUuid(custodian) ? 'Custodian ID is a UUID' : null,
+    location: !location ? 'Choose the store location' : null,
+    custodian: !custodian ? 'Choose the custodian' : null,
   };
   const n = group.quantity_received;
   const submit = () => {
     setTouched(true);
     if (errs.location || errs.custodian) return;
-    expand.mutate({ groupId: group.id, body: { location_id: location.trim(), custodian_id: custodian.trim() } });
+    expand.mutate({ groupId: group.id, body: { location_id: location, custodian_id: custodian } });
   };
-  const isMe = me && custodian.trim() === me.id;
+  const isMe = !!me && custodian === me.id;
 
   return (
     <>
@@ -86,25 +101,24 @@ function ExpandForm({ receiptId, group }: { receiptId: string; group: EquipmentG
         Creates {n} unit {n === 1 ? 'record' : 'records'} in the receiving store with a custodian. Verify each unit next to issue its Job ID.
       </InlineAlert>
       <FieldRow>
-        <TextInput
+        <LookupPicker
           label="Store location *"
-          mono
-          placeholder="Custody location ID (UUID)"
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
+          placeholder="Select location"
+          value={location || null}
+          onChange={(id) => setLocation(id ?? '')}
+          source={custodyLocationSource}
           error={touched ? errs.location : null}
         />
-        <TextInput
+        <LookupPicker
           label="Custodian *"
-          mono
-          value={custodian}
-          onChange={(e) => setCustodian(e.target.value)}
+          placeholder="Select employee"
+          value={custodian || null}
+          onChange={(id) => setCustodian(id ?? '')}
+          source={CUSTODIANS}
           error={touched ? errs.custodian : null}
-          helper={isMe ? `You · ${me!.full_name}` : 'Employee ID (UUID)'}
+          helper={isMe ? 'You' : 'Who holds the units in the store'}
         />
       </FieldRow>
-      <GapNote code="G18">No custody-location lookup in the API — enter the receiving location's ID.</GapNote>
-      <GapNote code="G17">No employee lookup — the custodian defaults to you; enter another employee's ID to change it.</GapNote>
       <FormErrors error={expand.error} />
       <div className="flex w-full items-start justify-end overflow-clip">
         <Button kind="primary" busy={expand.isPending} icon={<Ic icon={IconStack2} size={18} />} onClick={submit}>
@@ -116,18 +130,16 @@ function ExpandForm({ receiptId, group }: { receiptId: string; group: EquipmentG
 }
 
 // ---------------------------------------------------------------- units + fan-out
-function Units({ units, jobs, canWork, onVerify, onAssign }: {
-  units: EquipmentUnit[];
-  jobs: Record<string, UnitJob>;
+function Units({ units, canWork, onVerify, onAssign }: {
+  units: ReceiptUnit[];
   canWork: boolean;
-  onVerify: (unit: EquipmentUnit, index: number) => void;
-  onAssign: (unit: EquipmentUnit, index: number, job: UnitJob) => void;
+  onVerify: (unit: ReceiptUnit, index: number) => void;
+  onAssign: (unit: ReceiptUnit, index: number, job: UnitJob) => void;
 }) {
   const cols = Math.min(units.length, 3);
   const anyVerified = units.some((u) => u.verification_status === 'VERIFIED');
   const gaps = (cols - 1) * 16;
   const centre = (i: number) => `calc((100% - ${gaps}px) / ${cols} * ${i + 0.5} + ${i * 16}px)`;
-  const missingJob = units.some((u) => u.verification_status === 'VERIFIED' && !jobs[u.id]);
 
   return (
     <>
@@ -145,26 +157,21 @@ function Units({ units, jobs, canWork, onVerify, onAssign }: {
             key={u.id}
             unit={u}
             label={`Unit ${i + 1} of ${units.length}`}
-            job={jobs[u.id]}
+            job={unitJob(u)}
             canWork={canWork}
             onVerify={() => onVerify(u, i)}
             onAssign={(j) => onAssign(u, i, j)}
           />
         ))}
       </div>
-      {missingJob && (
-        <GapNote code="G?-B-2">
-          GET /inward-receipts/&#123;id&#125; doesn't return the Job ID of a verified unit. Units verified in another session or tab show without their job.
-        </GapNote>
-      )}
     </>
   );
 }
 
 function UnitCard({ unit, label, job, canWork, onVerify, onAssign }: {
-  unit: EquipmentUnit;
+  unit: ReceiptUnit;
   label: string;
-  job?: UnitJob;
+  job: UnitJob | null;
   canWork: boolean;
   onVerify: () => void;
   onAssign: (j: UnitJob) => void;
@@ -200,16 +207,18 @@ function UnitCard({ unit, label, job, canWork, onVerify, onAssign }: {
 function JobSlot({ job, canWork, onAssign }: { job: UnitJob; canWork: boolean; onAssign: () => void }) {
   const q = useJob(job.jobId);
   const a = q.data?.current_assignment ?? null;
+  const eng = useEngineersByIds([a?.engineer_id]);
+  const engName = a ? eng.data?.[a.engineer_id]?.full_name ?? `Engineer ${shortId(a.engineer_id)}` : '';
   const line = q.isPending ? 'Loading…'
     : q.isError ? "Couldn't load the job"
-      : a ? `Engineer ${shortId(a.engineer_id)} · ${a.response === 'PENDING' ? 'PENDING · awaiting custody' : enumLabel(a.response)}`
+      : a ? `${engName} · ${a.response === 'PENDING' ? 'PENDING · awaiting custody' : enumLabel(a.response)}`
         : 'Not assigned yet';
   return (
     <div className="flex w-full items-center gap-[10px] overflow-clip rounded-[14px] bg-subtle px-[12px] py-[10px]">
       <Ic icon={IconTool} size={18} className="text-fg" />
       <div className="flex min-w-0 flex-1 flex-col items-start overflow-clip whitespace-nowrap">
         <Link to={`/p/jobs/${job.jobId}`} className="font-mono text-[13px] font-medium leading-[18px] text-fg hover:underline">{job.jobNumber}</Link>
-        <p className="text-[12px] leading-[16px] text-fg-2" title={a?.engineer_id}>{line}</p>
+        <p className="text-[12px] leading-[16px] text-fg-2">{line}</p>
       </div>
       {q.data && !a && canWork && (
         <Button kind="ghost" icon={<Ic icon={IconUserPlus} size={18} />} onClick={onAssign}>Assign</Button>

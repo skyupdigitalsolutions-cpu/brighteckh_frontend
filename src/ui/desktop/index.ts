@@ -13,7 +13,7 @@ export { Popover, Scrim, useAnchor, useDismiss } from './Popover';
 export { Pagination, paginate } from './Pagination';
 export { Drawer } from './Drawer';
 export {
-  Field, FieldRow, TextInput, NumberInput, TextAreaField, SelectField, DateField, ReadOnlyField, ChoiceChips,
+  Field, FieldRow, boxState, TextInput, NumberInput, TextAreaField, SelectField, DateField, ReadOnlyField, ChoiceChips,
   PhotoPicker, type PickedFile,
 } from './Fields';
 export { EmptyState, ErrorState, StateCard, QueryView, errorBody } from './States';
@@ -21,3 +21,4 @@ export { InlineAlert, FormErrors, GapNote, GatedAction } from './Feedback';
 export { ToastProvider, useToast } from './Toast';
 export { Avatar, AvatarStack, initials } from './Avatar';
 export { PageHeader } from './PageHeader';
+export { LookupPicker, LookupRadioList, type LookupSource, type LookupQueryLike } from './LookupPicker';

@@ -1,15 +1,19 @@
 // Job workspace layout — Figma "J1 · Job · Overview" 177:116069: page header 177:116071 + tab bar 177:116073.
-// Header: title = job_number (API value, e.g. JOB-BLR-000094; Figma draws "J-00142"); meta = the unit as received
-// from the job's inward receipt (JIN · unit n of N · make · model · serial). Figma meta "VFD control card ·
-// ACS550 · Bharat Drives Pvt Ltd" also names the assembly and the customer — neither is readable (G19, G16).
-// Team: the current engineer has no readable name (G17) → not rendered.
+// Header: title = job_number (API value, e.g. JOB-BLR-000094; Figma draws "J-00142"); meta = Figma "VFD control card ·
+// ACS550 · Bharat Drives Pvt Ltd" = assembly name · observed model · customer name. Assembly = the unit's equipment
+// group → GET /lookups/assemblies?ids=; customer = receipt.customer_id → GET /lookups/customers?ids=.
+// Team = the current engineer (GET /lookups/engineers?ids=; falls back to the name in GET /jobs/{id}/progress when the
+// engineer is no longer active). Omitted when there is no current assignment.
 // Tabs (job workspace bar has no shadow): Overview · Inspection · Material · Sourcing · Quote · Authorisation ·
 // Purchase order · Repair & test. Tab content is an <Outlet/>; screens read the loaded job via useJobWorkspace().
 // Route: /p/jobs/:jobId/* — child paths overview | inspection | material | sourcing | quote | authorisation |
 // purchase-order | repair-test (index redirects to overview).
 import { Navigate, Outlet, useOutletContext, useParams } from 'react-router-dom';
 import { IconFileUnknown } from '@tabler/icons-react';
-import { useJob, useReceipt, type EquipmentUnit, type InwardReceipt, type Job } from '../api';
+import {
+  useAssembliesByIds, useCustomersByIds, useEngineersByIds, useJob, useJobProgress, useReceipt,
+  type AssemblyLookupRow, type CustomerLookupRow, type EquipmentUnit, type InwardReceipt, type Job,
+} from '../api';
 import { PageHeader } from '../../../ui/desktop/PageHeader';
 import { PageContent } from '../../../ui/desktop/Glass';
 import { TabBar, TabLink } from '../../../ui/desktop/Tabs';
@@ -35,6 +39,15 @@ export type JobWorkspaceContext = {
   receipt: InwardReceipt | undefined;
   /** The physical unit this job was created for (from receipt.equipment_units). */
   unit: EquipmentUnit | undefined;
+  /** Units in the unit's equipment group (unit_number is numbered within the group). 0 while loading. */
+  unitsInGroup: number;
+  /** Customer of the receipt (lookup). undefined while loading / not found. */
+  customer: CustomerLookupRow | undefined;
+  customerLoading: boolean;
+  /** Assembly of the unit's equipment group (lookup). */
+  assembly: AssemblyLookupRow | undefined;
+  /** Current engineer's name (lookup, else progress history). null if unassigned or unknown. */
+  engineerName: string | null;
 };
 
 /** Tab screens call this to get the loaded job (only valid under <JobWorkspace>). */
@@ -48,19 +61,18 @@ function Tabs({ jobId }: { jobId: string }) {
   );
 }
 
-export function unitMeta(receipt: InwardReceipt | undefined, unit: EquipmentUnit | undefined): string {
-  if (!receipt || !unit) return '';
-  const of = receipt.equipment_units.length;
-  return [
-    `${receipt.jin_number} · unit ${unit.unit_number} of ${of}`,
-    unit.observed_make, unit.observed_model, unit.serial_number && `S/N ${unit.serial_number}`,
-  ].filter(Boolean).join(' · ');
-}
-
 export function JobWorkspace() {
   const { jobId = '' } = useParams();
   const jobQ = useJob(jobId);
   const receiptQ = useReceipt(jobQ.data?.inward_id);
+  const progressQ = useJobProgress(jobQ.data ? jobId : undefined);
+  const receipt = receiptQ.data;
+  const unit = receipt?.equipment_units.find((u) => u.id === jobQ.data?.unit_id);
+  const group = unit ? receipt?.equipment_groups.find((g) => g.id === unit.group_id) : undefined;
+  const engineerId = jobQ.data?.current_assignment?.engineer_id;
+  const customersQ = useCustomersByIds([receipt?.customer_id]);
+  const assembliesQ = useAssembliesByIds([group?.assembly_id]);
+  const engineersQ = useEngineersByIds([engineerId]);
 
   if (jobQ.isPending) {
     return (
@@ -103,13 +115,26 @@ export function JobWorkspace() {
   }
 
   const job = jobQ.data;
-  const receipt = receiptQ.data;
-  const unit = receipt?.equipment_units.find((u) => u.id === job.unit_id);
-  const ctx: JobWorkspaceContext = { job, receipt, unit };
+  const customer = receipt ? customersQ.data?.[receipt.customer_id] : undefined;
+  const assembly = group ? assembliesQ.data?.[group.assembly_id] : undefined;
+  const engineerName = engineerId
+    ? engineersQ.data?.[engineerId]?.full_name
+      ?? progressQ.data?.assignments.find((x) => x.is_current)?.engineer_name
+      ?? null
+    : null;
+  const unitsInGroup = receipt && unit ? receipt.equipment_units.filter((u) => u.group_id === unit.group_id).length : 0;
+  const ctx: JobWorkspaceContext = {
+    job, receipt, unit, unitsInGroup, customer, customerLoading: !!receipt && customersQ.isPending, assembly, engineerName,
+  };
+  const meta = [assembly?.assembly_name, unit?.observed_model, customer?.customer_name].filter(Boolean).join(' · ');
 
   return (
     <>
-      <PageHeader title={job.job_number} meta={unitMeta(receipt, unit)} />
+      <PageHeader
+        title={job.job_number}
+        meta={meta}
+        team={engineerId && engineerName ? [{ name: engineerName, seed: engineerId }] : undefined}
+      />
       <PageContent>
         <Tabs jobId={jobId} />
         <Outlet context={ctx} />

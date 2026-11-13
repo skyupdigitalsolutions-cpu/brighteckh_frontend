@@ -1,26 +1,22 @@
-// BR-04 sourcing — LOCAL query hooks this group needs beyond src/pages/purchase/api.ts (reported to the coordinator).
+// BR-04 sourcing — LOCAL query helpers this group needs beyond src/pages/purchase/api.ts.
 //
-// Item names: stock-check lines, shortages (via their stock-check line) and RFQ lines carry only `item_bridge_id`.
-// There is no "bridge row by id" endpoint (gap G?-C2-1). The closest real source is
-// GET /material-requests/{id}/catalogue (any role, company-scoped, APPROVED + active bridge rows, max 200 rows),
-// which returns item_bridge_id + item_code + item_name. We read it once (limit 200) and map ids → code/name; an id
-// that isn't in that list (de-listed item, >200 items) renders its UUID prefix with a GapNote.
+// Item names: RFQ lines carry item_code / item_name (GET /rfqs/{id}); stock-check lines and shortages (via their
+// stock-check line) carry only `item_bridge_id`, resolved with the shared useItemBridgeByIds (GET /lookups/item-bridge).
 //
 // Material requests: GET /material-requests is the Purchase inbox (whole company). The job's requests are
-// filtered client-side by job_id (no /jobs/{id}/material-requests GET exists).
+// filtered client-side by job_id (no /jobs/{id}/material-requests GET exists). A stock check needs the job's
+// submitted (non-DRAFT) request.
 import { useMemo } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { http } from '../../../api/http';
 import type { S } from '../../../api/types';
-import { pk, purchaseApi, type Rfq, type RfqRow } from '../api';
+import { pk, purchaseApi, type ItemBridgeLookupRow, type Rfq, type RfqRow } from '../api';
 
 export type MaterialRequestRow = S<'Br03MaterialRequestsRow'>;
-export type CatalogueItem = S<'CatalogueItem'>;
-export type ItemName = { code: string; name: string; uom: string };
+export type ItemName = { code: string; name: string };
 
 const sk = {
   mrs: ['purchase', 'sourcing', 'material-requests'] as const,
-  catalogue: (mrId: string) => ['purchase', 'sourcing', 'catalogue', mrId] as const,
 };
 
 /** GET /material-requests (Purchase inbox, newest first). */
@@ -40,22 +36,6 @@ export function useJobMaterialRequests(jobId: string | undefined) {
   return { query: q, forJob, submitted };
 }
 
-/** bridge id → {code, name, uom}, from GET /material-requests/{mrId}/catalogue?limit=200. */
-export function useItemNames(mrId: string | undefined) {
-  const q = useQuery({
-    queryKey: sk.catalogue(mrId ?? ''),
-    queryFn: () => http.get<CatalogueItem[]>(`/material-requests/${mrId}/catalogue`, { params: { limit: '200' } }).then((r) => r.data),
-    enabled: !!mrId,
-    staleTime: 5 * 60_000,
-  });
-  const map = useMemo(() => {
-    const m = new Map<string, ItemName>();
-    for (const c of q.data ?? []) m.set(c.item_bridge_id, { code: c.master_item_code ?? c.item_code, name: c.master_standard_name ?? c.item_name, uom: c.uom });
-    return m;
-  }, [q.data]);
-  return { query: q, map };
-}
-
 /** Details of several RFQs (the job's RFQ list only returns headers; lines/invites/offers come from GET /rfqs/{id}). */
 export function useRfqDetails(rows: RfqRow[] | undefined) {
   return useQueries({
@@ -64,3 +44,10 @@ export function useRfqDetails(rows: RfqRow[] | undefined) {
 }
 
 export const shortId = (uuid: string) => uuid.slice(0, 8);
+
+/** Bridge row → {code, name}; while the lookup is loading (or the row is missing) → "…" placeholders. */
+export function itemOf(rows: Record<string, ItemBridgeLookupRow> | undefined, bridgeId: string, loading: boolean): ItemName {
+  const r = rows?.[bridgeId];
+  if (r) return { code: r.item_code, name: r.item_name };
+  return loading ? { code: '…', name: '…' } : { code: shortId(bridgeId), name: `Item ${shortId(bridgeId)}` };
+}

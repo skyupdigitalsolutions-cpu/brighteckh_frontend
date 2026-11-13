@@ -1,31 +1,52 @@
-// Figma "D·P2a · JIN detail · verify unit (photo gate)" 177:103100 → SideDrawer 177:103185 (480 wide).
+// Figma "D·P2a · JIN detail · verify unit (photo gate)" 177:103100 → kit Drawer variant="side" 177:103185 (480 wide).
 // Body: Photo capture "Unit photos" (required) · "Unit details" (Desktop/H3 15/20) · Serial number · Observed make /
 // model · Reported fault · Physical condition (Text field 36px box, px-12, radius 12, surface fill, 1px border-strong).
 // Footer: Gated action — blocked "Add a photo to continue" + "Take photo" + disabled "Verify & create Job ID";
 // ready = "n photos attached" + enabled primary.
-// Flow: each picked photo → POST /uploads → POST /equipment-units/{id}/photos { file_uri, file_name, mime_type,
-// file_size_bytes } immediately, so the gate reflects what the server holds. Then POST /equipment-units/{id}/verify
-// (no body) → { equipment_unit, job }. The DB enforces photo-before-verify too; its message is shown.
-// Gaps: G?-B-1 nothing writes serial / make / model / fault / condition (spec note 37:1148) → shown read-only from
-// the unit row. G?-B-3 no GET for a unit's photos → the gate counts photos attached in this drawer session.
+// Photos: each picked photo → POST /uploads → POST /equipment-units/{id}/photos immediately. The gate counts the
+// unit's photos on the server (GET /equipment-units/{id}/photos, useUnitPhotos), so photos added earlier count too.
+// Unit details: editable while the unit is PENDING / ON_HOLD (PATCH /equipment-units/{id}, useUpdateUnit) — saved
+// with "Save details" or automatically just before verify. POST /equipment-units/{id}/verify (no body) →
+// { equipment_unit, job }. The DB enforces photo-before-verify too; its message is shown.
 import { useEffect, useRef, useState } from 'react';
-import { IconCamera } from '@tabler/icons-react';
-import { FormErrors, GapNote, GatedAction, PhotoPicker, type PickedFile } from '../../../../ui/desktop';
+import { IconCamera, IconDeviceFloppy } from '@tabler/icons-react';
+import { Button, Drawer, FieldRow, FormErrors, GatedAction, Ic, PhotoPicker, type PickedFile } from '../../../../ui/desktop';
 import {
-  useAddUnitPhoto, useUpload, useVerifyUnit, type EquipmentUnit, type InwardReceipt, type VerifyUnitResult,
+  useAddUnitPhoto, useUnitPhotos, useUpdateUnit, useUpload, useVerifyUnit, type EquipmentUnit, type InwardReceipt,
+  type UpdateUnitBody, type VerifyUnitResult,
 } from '../../api';
-import { SideDrawer } from './local';
 
-type Slot = PickedFile & { file: File };
+type Slot = PickedFile & { file: File; fileUri?: string };
 
-function DetailBox({ label, value }: { label: string; value: string | null }) {
+type Details = { serial_number: string; observed_make: string; observed_model: string; reported_fault: string; physical_condition: string };
+const DETAIL_KEYS = ['serial_number', 'observed_make', 'observed_model', 'reported_fault', 'physical_condition'] as const;
+const detailsOf = (u: EquipmentUnit): Details => ({
+  serial_number: u.serial_number ?? '',
+  observed_make: u.observed_make ?? '',
+  observed_model: u.observed_model ?? '',
+  reported_fault: u.reported_fault ?? '',
+  physical_condition: u.physical_condition ?? '',
+});
+
+// P2a text field: label 14/20 Medium, gap 6; 36px box, px-12, radius 12, surface, 1px border-strong.
+function DetailInput({ label, value, onChange, disabled, mono }: {
+  label: string; value: string; onChange: (v: string) => void; disabled?: boolean; mono?: boolean;
+}) {
   return (
-    <div className="flex w-full flex-col items-start gap-[6px]">
-      <p className="whitespace-nowrap text-[14px] font-medium leading-[20px] text-fg">{label}</p>
-      <div className="flex h-[36px] w-full items-center overflow-clip rounded-t-field border border-line-strong bg-surface px-[12px]" aria-readonly="true">
-        <p className={value ? 'truncate text-[14px] leading-[20px] text-fg' : 'text-[14px] leading-[20px] text-fg-muted'}>{value || '—'}</p>
-      </div>
-    </div>
+    <label className="flex w-full flex-col items-start gap-[6px]">
+      <span className="whitespace-nowrap text-[14px] font-medium leading-[20px] text-fg">{label}</span>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        placeholder="—"
+        className={
+          'h-[36px] w-full rounded-t-field border border-line-strong bg-surface px-[12px] text-fg placeholder:text-fg-muted '
+          + 'focus:outline-none focus:ring-inside-brand disabled:bg-subtle disabled:text-fg-2 '
+          + (mono ? 'font-mono text-[13px] font-medium leading-[18px]' : 'text-[14px] leading-[20px]')
+        }
+      />
+    </label>
   );
 }
 
@@ -41,11 +62,19 @@ export function VerifyUnitDrawer({ open, onClose, receipt, unit, unitLabel, grou
 }) {
   const [slots, setSlots] = useState<Slot[]>([]);
   const [photoError, setPhotoError] = useState<unknown>(null);
+  const photos = useUnitPhotos(unit.id);
   const upload = useUpload();
   const addPhoto = useAddUnitPhoto(receipt.id);
   const verify = useVerifyUnit(receipt.id);
+  const update = useUpdateUnit(receipt.id);
   const camera = useRef<HTMLInputElement>(null);
   const seq = useRef(0);
+
+  const editable = unit.verification_status === 'PENDING' || unit.verification_status === 'ON_HOLD';
+  const [saved, setSaved] = useState<Details>(() => detailsOf(unit));
+  const [d, setD] = useState<Details>(() => detailsOf(unit));
+  const changed = DETAIL_KEYS.filter((k) => d[k].trim() !== saved[k].trim());
+  const setField = (k: keyof Details) => (v: string) => { update.reset(); setD((p) => ({ ...p, [k]: v })); };
 
   // Release previews when the drawer goes away.
   const slotsRef = useRef(slots);
@@ -62,7 +91,7 @@ export function VerifyUnitDrawer({ open, onClose, receipt, unit, unitLabel, grou
         unitId: unit.id,
         body: { file_uri: up.file_uri, file_name: up.original_name, mime_type: up.content_type, file_size_bytes: Number(up.size_bytes) },
       });
-      patch(key, { state: 'uploaded', progress: 100 });
+      patch(key, { state: 'uploaded', progress: 100, fileUri: up.file_uri });
     } catch (e) {
       setPhotoError(e);
       patch(key, { state: 'failed' });
@@ -84,17 +113,34 @@ export function VerifyUnitDrawer({ open, onClose, receipt, unit, unitLabel, grou
   };
   const retry = () => { setPhotoError(null); slots.filter((s) => s.state === 'failed').forEach((s) => { void send(s.key, s.file); }); };
 
-  const attached = slots.filter((s) => s.state === 'uploaded').length;
-  const uploading = slots.some((s) => s.state === 'uploading');
-  const ready = attached > 0 && !uploading;
+  // Thumbs = photos already on the server (added earlier, no local preview) + this drawer's slots.
+  const localUris = new Set(slots.map((s) => s.fileUri).filter(Boolean));
+  const earlier: PickedFile[] = (photos.data ?? [])
+    .filter((p) => !localUris.has(p.file_uri))
+    .map((p) => ({ key: p.id, name: p.file_name, state: 'uploaded' }));
+  const files: PickedFile[] = [...earlier, ...slots];
 
-  const doVerify = () => verify.mutate(unit.id, { onSuccess: (r) => onVerified(r) });
+  const uploading = slots.some((s) => s.state === 'uploading');
+  const attachedHere = slots.filter((s) => s.state === 'uploaded').length;
+  // Server count when known; while it loads / if it fails, what this drawer attached (the DB re-checks on verify).
+  const attached = photos.data ? photos.data.length : attachedHere;
+  const ready = attached > 0 && !uploading && !update.isPending;
+
+  const body = (): UpdateUnitBody => Object.fromEntries(changed.map((k) => [k, d[k].trim() || null])) as UpdateUnitBody;
+  const save = (then?: () => void) =>
+    update.mutate({ unitId: unit.id, body: body() }, { onSuccess: () => { setSaved(d); then?.(); } });
+
+  const doVerify = () => {
+    const go = () => verify.mutate(unit.id, { onSuccess: (r) => onVerified(r) });
+    if (editable && changed.length > 0) save(go); else go();
+  };
 
   return (
-    <SideDrawer
+    <Drawer
+      variant="side"
       open={open}
       onClose={onClose}
-      busy={verify.isPending || uploading}
+      busy={verify.isPending || uploading || update.isPending}
       title={`Verify unit ${unitLabel}`}
       subtitle={`${receipt.jin_number} · ${groupLabel}`}
       footer={
@@ -102,11 +148,11 @@ export function VerifyUnitDrawer({ open, onClose, receipt, unit, unitLabel, grou
           <FormErrors error={verify.error} />
           <GatedAction
             ready={ready}
-            reason={uploading ? 'Uploading photo…' : 'Add a photo to continue'}
+            reason={uploading ? 'Uploading photo…' : photos.isPending && attachedHere === 0 ? 'Checking photos…' : 'Add a photo to continue'}
             readyNote={`${attached} ${attached === 1 ? 'photo' : 'photos'} attached`}
             primaryLabel="Verify & create Job ID"
             onPrimary={doVerify}
-            busy={verify.isPending}
+            busy={verify.isPending || update.isPending}
             secondaryLabel={attached > 0 ? 'Add another photo' : 'Take photo'}
             secondaryIcon={IconCamera}
             onSecondary={() => camera.current?.click()}
@@ -122,18 +168,32 @@ export function VerifyUnitDrawer({ open, onClose, receipt, unit, unitLabel, grou
         hidden
         onChange={(e) => { if (e.target.files?.length) take(Array.from(e.target.files)); e.target.value = ''; }}
       />
-      <PhotoPicker title="Unit photos" required files={slots} onFiles={take} onRetry={retry} />
+      <PhotoPicker title="Unit photos" required files={files} onFiles={take} onRetry={retry} />
       {photoError != null && <FormErrors error={photoError} title="The photo was not attached" />}
-      <GapNote code="G?-B-3">The API has no list of a unit's photos, so only photos added here count toward the gate.</GapNote>
+      {photos.isError && <FormErrors error={photos.error} title="Couldn't load the unit's earlier photos" />}
       <p className="whitespace-nowrap text-[15px] font-semibold leading-[20px] text-fg">Unit details</p>
-      <DetailBox label="Serial number" value={unit.serial_number} />
-      <DetailBox
-        label="Observed make / model"
-        value={[unit.observed_make, unit.observed_model].filter(Boolean).join(' · ') || null}
-      />
-      <DetailBox label="Reported fault" value={unit.reported_fault} />
-      <DetailBox label="Physical condition" value={unit.physical_condition} />
-      <GapNote code="G?-B-1">No endpoint writes serial number, make / model, fault or condition (needs PATCH /equipment-units/&#123;id&#125;) — shown read-only.</GapNote>
-    </SideDrawer>
+      <DetailInput label="Serial number" mono value={d.serial_number} onChange={setField('serial_number')} disabled={!editable} />
+      <FieldRow>
+        <DetailInput label="Observed make" value={d.observed_make} onChange={setField('observed_make')} disabled={!editable} />
+        <DetailInput label="Observed model" value={d.observed_model} onChange={setField('observed_model')} disabled={!editable} />
+      </FieldRow>
+      <DetailInput label="Reported fault" value={d.reported_fault} onChange={setField('reported_fault')} disabled={!editable} />
+      <DetailInput label="Physical condition" value={d.physical_condition} onChange={setField('physical_condition')} disabled={!editable} />
+      {editable ? (
+        <div className="flex w-full flex-col items-end gap-[8px]">
+          <FormErrors error={update.error} title="The unit details were not saved" />
+          {changed.length > 0 && (
+            <Button kind="secondary" busy={update.isPending} icon={<Ic icon={IconDeviceFloppy} size={18} />} onClick={() => save()}>
+              Save details
+            </Button>
+          )}
+          {changed.length > 0 && <p className="text-[12px] leading-[16px] text-fg-2">Unsaved changes are saved when you verify.</p>}
+        </div>
+      ) : (
+        <p className="text-[12px] leading-[16px] text-fg-2">
+          This unit is {unit.verification_status.toLowerCase()} — the API doesn't allow changes to unit details after verification.
+        </p>
+      )}
+    </Drawer>
   );
 }

@@ -1,39 +1,18 @@
 // Jobs group data layer (LOCAL — not in the shared api.ts).
 //
-// Jobs list (G15): there is NO Purchase jobs list endpoint. GET /jobs/{id} is detail only and GET /my-jobs is
-// @Roles('ENGINEER'). useJobsList() is the list's data source and reports `unavailable`; the screen renders the
-// designed empty state + GapNote G15 + an "Open job" input. When a list endpoint ships, return its rows here (shape
-// JobListRow = the engineer MyJobRow shape with a nullable current assignment) and the table/filters/pagination work
-// unchanged.
-//
+// The jobs list itself is the shared useJobsList (GET /jobs, server pagination/filters/search) from ../api.
 // Overview reads (both un-roled on the backend, company-scoped, so Purchase can call them):
 //   GET /jobs/{id}/inspection-report   → InspectionReportDetail (404 "inspection report not found" = no report yet)
 //   GET /jobs/{id}/inspection-sessions → { sessions, time_totals }
 import { useQuery } from '@tanstack/react-query';
 import { http, apiStatus } from '../../../api/http';
 import type { S } from '../../../api/types';
-import type { Job, JobAssignment } from '../api';
+import type { Job } from '../api';
 
 export type JobStatus = Job['status'];
 export type JobPriority = Job['priority'];
-export type AssignmentResponse = JobAssignment['response'];
 export type InspectionReport = S<'InspectionReportDetail'>;
 export type InspectionSessions = S<'InspectionSessionsResponse'>;
-
-/** A jobs-list row. Mirrors the engineer list row (MyJobRow) — the closest existing list shape — but the current
- *  assignment can be null (unassigned jobs are in Purchase's list). */
-export type JobListRow = Omit<S<'MyJobRow'>, 'current_assignment'> & { current_assignment: JobAssignment | null };
-
-export type ListSource =
-  | { state: 'unavailable'; gap: 'G15' }
-  | { state: 'loading' }
-  | { state: 'error'; error: unknown; retry: () => void; retrying: boolean }
-  | { state: 'ready'; rows: JobListRow[] };
-
-/** The Purchase jobs list. No endpoint exists (G15), so this never fabricates rows. */
-export function useJobsList(): ListSource {
-  return { state: 'unavailable', gap: 'G15' };
-}
 
 const get = <T,>(url: string) => http.get<T>(url).then((r) => r.data);
 
@@ -81,14 +60,8 @@ export const PRIORITY_OPTIONS: { value: JobPriority | 'ALL'; label: string }[] =
   { value: 'CRITICAL', label: 'Critical' },
 ];
 
-/** Engineer filter: no engineer lookup (G17) → only "All" and "Unassigned"; never invented names. */
-export type EngineerFilter = 'ALL' | 'UNASSIGNED';
-export const ENGINEER_OPTIONS: { value: EngineerFilter; label: string }[] = [
-  { value: 'ALL', label: 'All engineers' },
-  { value: 'UNASSIGNED', label: 'Unassigned' },
-];
-
-/** Tab bar (Figma 177:111155) → service_jobs.status groups. The grouping is derived (Figma names, not API values). */
+/** Tab bar (Figma 177:111155, no counts drawn) → service_jobs.status groups sent as the list's `status` filter.
+ *  The grouping is derived (Figma names, not API values). */
 export type JobsTab = 'all' | 'awaiting' | 'progress' | 'hold' | 'closed';
 export const TABS: { key: JobsTab; label: string; statuses: JobStatus[] | null }[] = [
   { key: 'all', label: 'All jobs', statuses: null },
@@ -99,13 +72,6 @@ export const TABS: { key: JobsTab; label: string; statuses: JobStatus[] | null }
 ];
 
 export const isOpen = (s: JobStatus) => s !== 'CLOSED' && s !== 'CANCELLED';
-
-/** Latest timestamp the row carries (no updated_at on service_jobs). */
-export function lastActivity(r: JobListRow): string {
-  const ts = [r.created_at, r.current_assignment?.assigned_at, r.current_assignment?.responded_at, r.closed_at, r.cancelled_at]
-    .filter((x): x is string => !!x);
-  return ts.reduce((a, b) => (new Date(b) > new Date(a) ? b : a), r.created_at);
-}
 
 /** Figma "Updated" cell: today → "09:40", yesterday → "Yesterday", else "03 Nov" (IST). */
 const IST = 'Asia/Kolkata';
@@ -132,7 +98,4 @@ export function formatWaiting(iso: string | null | undefined): string | null {
   return `${Math.floor(h / 24)} d`;
 }
 
-export const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
-export const isUuid = (s: string) => new RegExp(`^${UUID_RE.source}$`, 'i').test(s.trim());
-/** Short id for display where no name exists (G17). */
-export const shortId = (id: string) => id.slice(0, 8);
+export const OPEN_STATUSES: JobStatus[] = ['JOB_CREATED', 'AWAITING_ASSIGNMENT', 'ASSIGNED', 'ACCEPTED', 'INSPECTION', 'ON_HOLD'];

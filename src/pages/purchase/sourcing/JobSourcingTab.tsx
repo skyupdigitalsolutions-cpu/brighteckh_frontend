@@ -2,8 +2,8 @@
 // "J4 · Stock check · new snapshot" 177:116808 (same layout + success "Result toast" 177:116821 under the tab bar).
 // Layout (Content gap 20): Context row 177:103567 (chips + spacer + "New snapshot" secondary) → "Stock vs required"
 // card 177:103579 → "Shortage sources" card 177:103644 (primary "Create RFQ for n shortage(s)").
-// Added (not drawn on D·P5): an "RFQs for this job" card using the S0 table rows — GET /jobs/{id}/rfqs is the only
-// way to reach a job's RFQs (G20: no cross-job RFQ list).
+// Added (not drawn on D·P5): an "RFQs for this job" card using the S0 table rows (GET /jobs/{id}/rfqs + each RFQ's
+// detail, so the drawn Item / Best landed / Needed by cells are filled here).
 //
 // API facts:
 // - A stock check is a SNAPSHOT: POST /jobs/{id}/stock-checks posts nothing to the ledger. It needs the job's
@@ -13,7 +13,7 @@
 //   drawer pre-selects the OPEN shortages of the current snapshot.
 // - Cost columns (WAC landed, Last buy) + the "Costs visible to Purchase only" chip render only when
 //   can.seeSupplierCost(role).
-// - Item code/name come from the material-request catalogue (data.ts, G?-C2-1).
+// - Item code/name: GET /lookups/item-bridge?ids= (useItemBridgeByIds) for the stock-check lines.
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -26,13 +26,13 @@ import { Badge, StatusPill } from '../../../ui/desktop/Badge';
 import { Ic } from '../../../ui/desktop/Icon';
 import { SkeletonRows } from '../../../ui/desktop/DataTable';
 import { EmptyState, ErrorState, errorBody } from '../../../ui/desktop/States';
-import { FormErrors, GapNote, InlineAlert } from '../../../ui/desktop/Feedback';
+import { FormErrors, InlineAlert } from '../../../ui/desktop/Feedback';
 import { enumLabel, formatDayTime, formatINR, formatQty, formatTime } from '../../../lib/format';
 import { useJobWorkspace } from '../job/JobWorkspace';
 import {
-  useRfqs, useRunStockCheck, useShortages, useStockChecks, type StockCheck, type StockCheckLine,
+  useItemBridgeByIds, useRfqs, useRunStockCheck, useShortages, useStockChecks, type StockCheck, type StockCheckLine,
 } from '../api';
-import { useItemNames, useJobMaterialRequests, useRfqDetails, shortId, type ItemName } from './data';
+import { itemOf, useJobMaterialRequests, useRfqDetails, shortId } from './data';
 import {
   CardHead, Cell, ContextChip, GridHead, GridRow, HCell, ItemTwo, Muted, Num, SectionCard,
 } from './ui';
@@ -40,8 +40,6 @@ import { CreateRfqDrawer, type ShortageChoice } from './CreateRfqDrawer';
 import { RfqTableHead, RfqTableRowView, rfqHref, rfqLabel } from './RfqTable';
 
 const isShort = (l: StockCheckLine) => Number(l.shortage_quantity ?? 0) > 0;
-const itemOf = (names: Map<string, ItemName>, bridgeId: string) =>
-  names.get(bridgeId) ?? { code: shortId(bridgeId), name: `Item ${shortId(bridgeId)}`, uom: '' };
 
 type Result = { title: string; body: string };
 
@@ -61,7 +59,6 @@ export function JobSourcingTab() {
 
   const checks = checksQ.data ?? [];
   const current: StockCheck | undefined = checks.find((c) => c.is_current) ?? checks[0];
-  const names = useItemNames(current?.material_request_id ?? mrs.submitted?.id ?? mrs.forJob[0]?.id).map;
   const mr = mrs.forJob.find((m) => m.id === current?.material_request_id) ?? mrs.submitted;
 
   const lineById = useMemo(() => {
@@ -69,6 +66,8 @@ export function JobSourcingTab() {
     for (const c of checks) for (const l of c.lines) m.set(l.id, { line: l, checkId: c.id });
     return m;
   }, [checks]);
+  const bridgeQ = useItemBridgeByIds(checks.flatMap((c) => c.lines.map((l) => l.item_bridge_id)));
+  const item = (bridgeId: string) => itemOf(bridgeQ.data, bridgeId, bridgeQ.isPending && bridgeQ.fetchStatus !== 'idle');
 
   const shortages = shortagesQ.data ?? [];
   const currentOpen = shortages.filter((s) => s.shortage_status === 'OPEN' && lineById.get(s.stock_check_line_id)?.checkId === current?.id);
@@ -76,13 +75,12 @@ export function JobSourcingTab() {
     .filter((s) => s.shortage_status === 'OPEN')
     .map((s) => {
       const l = lineById.get(s.stock_check_line_id)?.line;
-      const it = l ? itemOf(names, l.item_bridge_id) : { code: shortId(s.id), name: 'Item', uom: '' };
+      const it = l ? item(l.item_bridge_id) : { code: shortId(s.id), name: 'Item' };
       return { id: s.id, code: it.code, name: it.name, qty: s.shortage_quantity, uom: l?.uom_snapshot ?? '' };
     });
 
   const [result, setResult] = useState<Result | null>(null);
   const [rfqOpen, setRfqOpen] = useState(false);
-  const unknownItems = (current?.lines ?? []).some((l) => !names.has(l.item_bridge_id));
 
   const snapshot = () => {
     if (!mrs.submitted) return;
@@ -94,7 +92,7 @@ export function JobSourcingTab() {
           title: 'New snapshot taken',
           body: short.length === 0
             ? `Stock re-read at ${formatTime(c.checked_at)}. No shortages.`
-            : `Stock re-read at ${formatTime(c.checked_at)}. ${short.length === 1 ? 'Still 1 shortage' : `Still ${short.length} shortages`}: ${short.map((l) => itemOf(names, l.item_bridge_id).code).join(', ')}.`,
+            : `Stock re-read at ${formatTime(c.checked_at)}. ${short.length === 1 ? 'Still 1 shortage' : `Still ${short.length} shortages`}: ${short.map((l) => item(l.item_bridge_id).code).join(', ')}.`,
         });
       },
     });
@@ -167,7 +165,7 @@ export function JobSourcingTab() {
           </GridHead>
           <div className="flex w-full flex-col">
             {current.lines.map((l) => {
-              const it = itemOf(names, l.item_bridge_id);
+              const it = item(l.item_bridge_id);
               const u = l.uom_snapshot;
               return (
                 <GridRow key={l.id} highlight={isShort(l)}>
@@ -188,9 +186,6 @@ export function JobSourcingTab() {
               );
             })}
           </div>
-          {unknownItems && (
-            <GapNote code="G?-C2-1">Some lines show the catalogue id only: there is no item lookup by item_bridge_id, and this item is not in the approved catalogue list.</GapNote>
-          )}
         </div>
       )}
     </SectionCard>
@@ -228,7 +223,7 @@ export function JobSourcingTab() {
           <div className="flex w-full flex-col">
             {shortages.map((s) => {
               const l = lineById.get(s.stock_check_line_id)?.line;
-              const it = l ? itemOf(names, l.item_bridge_id) : { code: shortId(s.id), name: 'Item', uom: '' };
+              const it = l ? item(l.item_bridge_id) : { code: shortId(s.id), name: 'Item' };
               return (
                 <GridRow key={s.id}>
                   <Cell grow><ItemTwo code={it.code} name={it.name} /></Cell>
@@ -266,7 +261,6 @@ export function JobSourcingTab() {
             <RfqTableRowView
               key={h.id}
               row={{ header: h, detail: details[i]?.data, job: { id: job.id, number: job.job_number } }}
-              names={names}
               canSeeCost={canSeeCost}
               canAct={canAct}
             />
@@ -294,7 +288,7 @@ export function JobSourcingTab() {
           preselected={(currentOpen.length ? currentOpen : openChoices).map((s) => s.id)}
           onCreated={(r) => {
             setRfqOpen(false);
-            nav(rfqHref(r.id, job.id, { tab: 'suppliers', created: rfqLabel(r) }));
+            nav(rfqHref(r.id, { tab: 'suppliers', created: rfqLabel(r) }));
           }}
         />
       )}

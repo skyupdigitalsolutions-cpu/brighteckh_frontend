@@ -2,33 +2,35 @@
 // Compared 177:120379 · Expired 177:120454, search "igbt" 177:120510, row menus 177:120567 … 177:121671).
 // Page header: "Sourcing" / "RFQs raised from job shortages · supplier offers · landed-cost comparison".
 // Tab bar (shadow) → Toolbar 177:120033 (glass, radius 30, pl-20 pr-10 py-10, gap 10: "New RFQ" primary · count ·
-// spacer · 300px search) → Table card 177:120040 (kit TableCard, rows = RfqTable).
+// spacer · 300px search) → Table card 177:120040 (kit TableCard, rows = RfqListRowView) → Pagination.
 //
-// G20: there is NO cross-job RFQ list endpoint (only GET /jobs/{id}/rfqs). The list is built as drawn, but it has no
-// rows to show: the table card renders its empty state with the G20 note, an "Open RFQ" field (RFQ UUID or link) and
-// the real path — a job's Sourcing tab. Tabs use the API enum (incl. CANCELLED, which Figma does not draw) and carry
-// no counts (nothing to count). "New RFQ" needs the job (RFQs are per job): it asks for the Job ID/link (G15: no
-// Purchase jobs list) and opens that job's Sourcing tab, where the shortages are picked.
+// Data: GET /rfqs (PURCHASE) with server pagination, status tab and debounced search. Tabs follow the API enum plus
+// CANCELLED (not drawn). Figma's tabs carry no counts, so none are fetched. Search placeholder: Figma "item" →
+// "customer" (the API searches RFQ number, job number, customer name and invited supplier name, not items). "New RFQ" picks the job by name/number
+// (LookupPicker over GET /jobs) and opens that job's Sourcing tab, where the shortages are picked (RFQs are per job).
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { IconArrowRight, IconPlus, IconSearch } from '@tabler/icons-react';
+import { IconFileSearch, IconPlus, IconSearch } from '@tabler/icons-react';
 import { useAuth } from '../../../auth/AuthProvider';
 import { can } from '../../../auth/access';
 import { PageHeader } from '../../../ui/desktop/PageHeader';
 import { PageContent } from '../../../ui/desktop/Glass';
 import { TabBar, Tab } from '../../../ui/desktop/Tabs';
 import { SearchField } from '../../../ui/desktop/SearchField';
-import { TableCard } from '../../../ui/desktop/DataTable';
+import { SkeletonRows, TableCard } from '../../../ui/desktop/DataTable';
 import { Button } from '../../../ui/desktop/Button';
 import { Ic } from '../../../ui/desktop/Icon';
-import { EmptyState } from '../../../ui/desktop/States';
+import { EmptyState, ErrorState, errorBody } from '../../../ui/desktop/States';
 import { GapNote } from '../../../ui/desktop/Feedback';
 import { Drawer } from '../../../ui/desktop/Drawer';
-import { TextInput } from '../../../ui/desktop/Fields';
-import type { RfqRow } from '../api';
-import { RfqTableHead } from './RfqTable';
+import { Pagination } from '../../../ui/desktop/Pagination';
+import { LookupPicker } from '../../../ui/desktop/LookupPicker';
+import { useDebouncedValue } from '../../../lib/useDebouncedValue';
+import { useRfqsList, type RfqListRow } from '../api';
+import { RfqListHead, RfqListRowView } from './RfqTable';
+import { jobSource } from './jobSource';
 
-type Status = RfqRow['rfq_status'];
+type Status = RfqListRow['rfq_status'];
 const TABS: { value: Status | 'ALL'; label: string }[] = [
   { value: 'ALL', label: 'All' },
   { value: 'DRAFT', label: 'Draft' },
@@ -38,81 +40,81 @@ const TABS: { value: Status | 'ALL'; label: string }[] = [
   { value: 'EXPIRED', label: 'Expired' },
   { value: 'CANCELLED', label: 'Cancelled' },
 ];
-
-const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
-/** Pull a UUID out of a pasted id or link (e.g. …/p/rfqs/<uuid>?job=…). The first UUID in the text wins. */
-export const parseUuid = (text: string) => UUID.exec(text.trim())?.[0]?.toLowerCase() ?? null;
-
-export function OpenByIdForm({ label, placeholder, buttonLabel, onOpen }: {
-  label: string; placeholder: string; buttonLabel: string; onOpen: (id: string) => void;
-}) {
-  const [v, setV] = useState('');
-  const [err, setErr] = useState<string | null>(null);
-  return (
-    <form
-      className="flex w-full items-end gap-[10px] text-left"
-      onSubmit={(e) => {
-        e.preventDefault();
-        const id = parseUuid(v);
-        if (!id) { setErr('Paste the UUID or a link that contains it.'); return; }
-        onOpen(id);
-      }}
-    >
-      <TextInput label={label} mono placeholder={placeholder} value={v} error={err} onChange={(e) => { setV(e.target.value); setErr(null); }} />
-      <Button kind="secondary" type="submit" icon={<Ic icon={IconArrowRight} size={18} />} className={err ? 'mb-[22px]' : undefined}>{buttonLabel}</Button>
-    </form>
-  );
-}
+const PAGE_SIZE = 25;
 
 export function RfqListPage() {
   const nav = useNavigate();
   const { me } = useAuth();
   const role = me?.role;
-  const canSeeCost = !!role && can.seeSupplierCost(role);
   const canAct = !!role && can.purchaseWork(role);
   const [tab, setTab] = useState<Status | 'ALL'>('ALL');
   const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
+  const search = useDebouncedValue(q.trim());
   const [newOpen, setNewOpen] = useState(false);
-  const [jobText, setJobText] = useState('');
+  const [jobId, setJobId] = useState<string | null>(null);
   const [jobErr, setJobErr] = useState<string | null>(null);
 
-  // No rows can be loaded (G20); `rows` stays empty and tab/search filter nothing.
-  const rows: RfqRow[] = [];
-  const shown = rows.filter((r) => tab === 'ALL' || r.rfq_status === tab);
-  const filtered = q.trim() ? [] : shown;
+  const listQ = useRfqsList({
+    page,
+    page_size: PAGE_SIZE,
+    ...(tab !== 'ALL' ? { status: tab } : {}),
+    ...(search ? { search } : {}),
+  });
+  const data = listQ.data;
+  const total = data?.total ?? 0;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const rows = data?.rows ?? [];
+
+  const tabNote = tab === 'COMPARED'
+    ? <GapNote code="C2-5">Nothing in the API moves an RFQ to COMPARED, so this tab stays empty.</GapNote>
+    : tab === 'CANCELLED'
+      ? <GapNote code="C2-4">There is no endpoint to cancel an RFQ, so Cancel RFQ is hidden and this tab stays empty.</GapNote>
+      : null;
 
   return (
     <>
       <PageHeader title="Sourcing" meta="RFQs raised from job shortages · supplier offers · landed-cost comparison" />
       <PageContent>
         <TabBar shadow label="RFQ status">
-          {TABS.map((t) => <Tab key={t.value} active={tab === t.value} onClick={() => setTab(t.value)} label={t.label} />)}
+          {TABS.map((t) => <Tab key={t.value} active={tab === t.value} onClick={() => { setTab(t.value); setPage(1); }} label={t.label} />)}
         </TabBar>
 
         <div className="glass flex w-full items-center gap-[10px] overflow-clip rounded-t-toolbar py-[10px] pl-[20px] pr-[10px] shadow-glass">
           {canAct && (
-            <Button kind="primary" icon={<Ic icon={IconPlus} size={18} />} onClick={() => { setJobText(''); setJobErr(null); setNewOpen(true); }}>New RFQ</Button>
+            <Button kind="primary" icon={<Ic icon={IconPlus} size={18} />} onClick={() => { setJobId(null); setJobErr(null); setNewOpen(true); }}>New RFQ</Button>
           )}
-          <span className="whitespace-nowrap text-[14px] leading-[20px] text-fg-2">{filtered.length === 1 ? '1 RFQ' : `${filtered.length} RFQs`}</span>
+          <span className="whitespace-nowrap text-[14px] leading-[20px] text-fg-2">
+            {data ? (total === 1 ? '1 RFQ' : `${total} RFQs`) : '…'}
+          </span>
           <div className="h-px min-w-px flex-1" />
-          <SearchField value={q} onChange={setQ} placeholder="Search RFQ, job, item, supplier" width={300} />
+          <SearchField value={q} onChange={(v) => { setQ(v); setPage(1); }} placeholder="Search RFQ, job, customer, supplier" width={300} />
         </div>
 
+        {tabNote}
+
         <TableCard fill>
-          <RfqTableHead canSeeCost={canSeeCost} />
-          <div className="flex flex-1 flex-col items-center justify-center py-[24px]">
-            <EmptyState
-              icon={IconSearch}
-              title={q.trim() ? `No RFQs match "${q.trim()}"` : 'No RFQs to list here'}
-              body={(
-                <div className="flex w-full flex-col items-stretch gap-[14px]">
-                  <p>RFQs are raised per job. Open a job's Sourcing tab to see its RFQs, or open one directly.</p>
-                  <GapNote code="G20">There is no cross-job RFQ list in the API (only GET /jobs/{'{id}'}/rfqs), so this register cannot list or count RFQs.</GapNote>
-                  <OpenByIdForm label="Open RFQ" placeholder="RFQ UUID or link" buttonLabel="Open" onOpen={(id) => nav(`/p/rfqs/${id}`)} />
-                </div>
-              )}
-            />
-          </div>
+          <RfqListHead />
+          {listQ.isPending ? (
+            <SkeletonRows rows={8} widths={[120, 100, 260, 160, 110, 170]} />
+          ) : listQ.isError ? (
+            <div className="flex flex-1 items-center justify-center py-[24px]">
+              <ErrorState title="Couldn't load RFQs" body={errorBody(listQ.error)} onRetry={() => listQ.refetch()} retrying={listQ.isFetching} />
+            </div>
+          ) : rows.length === 0 ? (
+            <div className="flex flex-1 flex-col items-center justify-center py-[24px]">
+              <EmptyState
+                icon={search ? IconSearch : IconFileSearch}
+                title={search ? `No RFQs match "${search}"` : tab === 'ALL' ? 'No RFQs yet' : 'No RFQs in this status'}
+                body={search ? 'Search covers RFQ number, job number, customer and invited supplier.' : 'RFQs are raised from a job\'s shortages on its Sourcing tab.'}
+              />
+            </div>
+          ) : (
+            <div className={listQ.isPlaceholderData ? 'flex w-full flex-col opacity-60' : 'flex w-full flex-col'}>
+              {rows.map((r) => <RfqListRowView key={r.id} row={r} canAct={canAct} />)}
+            </div>
+          )}
+          {pages > 1 && <Pagination page={Math.min(page, pages)} pages={pages} onChange={setPage} className="mt-auto" />}
         </TableCard>
       </PageContent>
 
@@ -123,9 +125,8 @@ export function RfqListPage() {
           title="New RFQ"
           subtitle="An RFQ is raised from one job's shortages"
           onSubmit={() => {
-            const id = parseUuid(jobText);
-            if (!id) { setJobErr('Paste the Job UUID or a job link.'); return; }
-            nav(`/p/jobs/${id}/sourcing`);
+            if (!jobId) { setJobErr('Choose the job.'); return; }
+            nav(`/p/jobs/${jobId}/sourcing`);
           }}
           footer={(
             <>
@@ -134,16 +135,17 @@ export function RfqListPage() {
             </>
           )}
         >
-          <TextInput
+          <LookupPicker
             label="Job *"
-            mono
-            placeholder="Job UUID or link"
-            value={jobText}
-            error={jobErr}
+            placeholder="Search job, JIN, customer, serial…"
             helper="Pick the shortages on the job's Sourcing tab."
-            onChange={(e) => { setJobText(e.target.value); setJobErr(null); }}
+            value={jobId}
+            onChange={(id) => { setJobId(id); setJobErr(null); }}
+            source={jobSource}
+            error={jobErr}
+            clearable
+            autoFocus
           />
-          <GapNote code="G15">No Purchase jobs list/lookup exists, so the job is entered by its id or link.</GapNote>
         </Drawer>
       )}
     </>

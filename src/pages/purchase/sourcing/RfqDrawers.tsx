@@ -26,7 +26,6 @@ import {
   useAddSupplierInvite, useMarkOfferValidity, useRecordOffer,
   type OfferLine, type OfferLineBody, type OfferRecorded, type Rfq, type SupplierInvite,
 } from '../api';
-import type { ItemName } from './data';
 import { shortId } from './data';
 
 // ---------------------------------------------------------------- invite
@@ -96,8 +95,8 @@ function landedPreview(qty: number, l: LineIn): string | null {
   return v.toFixed(2);
 }
 
-export function RecordOfferDrawer({ open, onClose, rfq, names, jobId, preselectInvite, onDone }: {
-  open: boolean; onClose: () => void; rfq: Rfq; names: Map<string, ItemName>; jobId?: string; preselectInvite?: string;
+export function RecordOfferDrawer({ open, onClose, rfq, jobId, preselectInvite, onDone }: {
+  open: boolean; onClose: () => void; rfq: Rfq; jobId?: string; preselectInvite?: string;
   onDone: (o: OfferRecorded, supplier: string) => void;
 }) {
   const m = useRecordOffer(rfq.id, jobId);
@@ -190,13 +189,12 @@ export function RecordOfferDrawer({ open, onClose, rfq, names, jobId, preselectI
         const l = get(rl.id);
         const qty = Number(rl.quantity);
         const er = tried ? lineErrors(rl.id, qty) : null;
-        const it = names.get(rl.item_bridge_id);
         const preview = landedPreview(qty, l);
         return (
           <div key={rl.id} className="flex w-full flex-col gap-[18px]">
             {!one && (
               <p className="text-[14px] font-semibold leading-[20px] text-fg">
-                Line {rl.line_no} · {it?.name ?? `Item ${shortId(rl.item_bridge_id)}`} · {formatQty(rl.quantity, rl.uom)}
+                Line {rl.line_no} · {rl.item_name ?? `Item ${shortId(rl.item_bridge_id)}`} · {formatQty(rl.quantity, rl.uom)}
               </p>
             )}
             <FieldRow>

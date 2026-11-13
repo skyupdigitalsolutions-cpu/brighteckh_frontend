@@ -6,6 +6,7 @@
 // so pass the same `w` to TH and TD. Cell text presets: id (Data/ID 13/18 mono Medium), text (14/20 secondary),
 // strong (14/20 Medium primary), small (12/16 secondary), number (Data/Number 14/20 mono).
 // Also: ToolbarCard (177:102743), UnitsProgress (Units verified bar 72×6), SkeletonRows (177:102979).
+// `gap` (px) on THead/TR adds a column gap for the tables drawn with 12px cell gaps; pass the same value to both.
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { cx } from './Icon';
@@ -28,8 +29,16 @@ export function ToolbarCard({ children, className }: { children: ReactNode; clas
 }
 export const ToolbarSpacer = () => <div className="h-px min-w-px flex-1" aria-hidden />;
 
-export function THead({ children }: { children: ReactNode }) {
-  return <div role="row" className="flex w-full shrink-0 items-start overflow-clip rounded-t-popover bg-subtle px-[16px] py-[12px]">{children}</div>;
+export function THead({ children, className, gap }: { children: ReactNode; className?: string; gap?: number }) {
+  return (
+    <div
+      role="row"
+      className={cx('flex w-full shrink-0 items-start overflow-clip rounded-t-popover bg-subtle px-[16px] py-[12px]', className)}
+      style={gap ? { columnGap: gap } : undefined}
+    >
+      {children}
+    </div>
+  );
 }
 
 type CellProps = { w?: number; grow?: boolean; children?: ReactNode; className?: string; align?: 'left' | 'right' };
@@ -63,15 +72,19 @@ export function TD({ w, grow, children, className, align, kind = 'custom' }: Cel
 const rowCls = 'flex w-full shrink-0 items-center overflow-clip border-b border-line px-[16px] py-[14px] transition-colors hover:bg-surface';
 
 /** A data row. Pass `to` for a navigable row (whole row is a link), or `onClick`. */
-export function TR({ children, to, onClick, selected, className }: {
+export function TR({ children, to, onClick, selected, className, gap }: {
   children: ReactNode; to?: string; onClick?: () => void; selected?: boolean; className?: string;
+  /** Column gap in px (match THead `gap`). */
+  gap?: number;
 }) {
-  if (to) return <Link role="row" to={to} className={cx(rowCls, selected && 'bg-surface', className)}>{children}</Link>;
+  const style = gap ? { columnGap: gap } : undefined;
+  if (to) return <Link role="row" to={to} className={cx(rowCls, selected && 'bg-surface', className)} style={style}>{children}</Link>;
   return (
     <div
       role="row"
       onClick={onClick}
       className={cx(rowCls, onClick && 'cursor-pointer', selected && 'bg-surface', className)}
+      style={style}
     >
       {children}
     </div>

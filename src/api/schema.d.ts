@@ -333,7 +333,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Inward register (G14): the company's JINs with customer name and unit counts
+         * @description Paginated: `page` (default 1), `page_size` (default 25, max 100) -> { rows, total, page, page_size }. Filters: `status`, `priority` (comma-separated DB values), `month` (YYYY-MM of receipt_at, company timezone), `search` (JIN number, customer name/code, customer DC number). Newest receipt_at first.
+         */
+        get: operations["PurchaseDeskBr02Controller_listReceipts"];
         put?: never;
         post: operations["Br02Controller_createReceipt"];
         delete?: never;
@@ -398,7 +402,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Photos recorded against an equipment unit (B-3), oldest first
+         * @description Any role in the unit's company (same access as GET /inward-receipts/:id).
+         */
+        get: operations["PurchaseDeskBr02Controller_unitPhotos"];
         put?: never;
         post: operations["Br02Controller_addPhoto"];
         delete?: never;
@@ -3340,6 +3348,246 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Jobs list (G15): company jobs with customer, equipment, current engineer and last activity
+         * @description Paginated: `page` (default 1), `page_size` (default 25, max 100) -> { rows, total, page, page_size }. Filters: `status`, `priority` (comma-separated), `engineer_id` (UUID or `unassigned`), `search` (job number, JIN, serial, make, model, assembly code/name, customer name/code). Newest job first.
+         */
+        get: operations["PurchaseDeskBr02Controller_listJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{id}/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Job progress (C1-1): 10 derived stages BR-02..BR-08 + full assignment history with names
+         * @description Purely derived from recorded rows; each stage carries its `source` table(s) and exact `rule`. No stage state is invented: an un-recorded stage is `pending`, not "skipped".
+         */
+        get: operations["PurchaseDeskBr02Controller_progress"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/equipment-units/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Edit unit details (B-1): serial, make/model, reported fault, physical condition, accessories
+         * @description Only the keys sent are changed; null or "" clears a field. Allowed only while the unit's verification_status is PENDING or ON_HOLD (before verification / Job ID) -- OPEN DECISION, see CLAUDE.md §4i. Writes an activity_audit_log row (BR02_UNIT_DETAILS_UPDATED) with the before/after values of the changed fields.
+         */
+        patch: operations["PurchaseDeskBr02Controller_updateUnit"];
+        trace?: never;
+    };
+    "/api/rfqs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * RFQ list (G20) with the job each RFQ was raised from and invite/offer counts
+         * @description Paginated: `page` (default 1), `page_size` (default 25, max 100) -> { rows, total, page, page_size }. Filters: `status` (comma-separated rfq_status), `job_id`, `search` (RFQ number, job number, customer name, invited supplier name). Newest first. PURCHASE only, like GET /rfqs/:id. No prices.
+         */
+        get: operations["PurchaseDeskBr04Controller_listRfqs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/quotes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Customer quote list (G21) with job, customer and the latest revision's status and pre-tax total
+         * @description Paginated: `page` (default 1), `page_size` (default 25, max 100) -> { rows, total, page, page_size }. Filters: `status` (comma-separated, matched on the LATEST revision), `job_id`, `search` (quote number, job number, customer name/code). Newest latest-revision first. Customer-facing fields only.
+         */
+        get: operations["PurchaseDeskBr04Controller_listQuotes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lookups/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Customers of the caller's company (G16)
+         * @description Paginated: `page` (default 1), `page_size` (default 25, max 100) -> { rows, total, page, page_size }. `search` = name/code; `ids` resolves known ids; `status` defaults to PENDING_APPROVAL,APPROVED (what a JIN accepts). Ordered by name. Contact/GST/address fields are not returned.
+         */
+        get: operations["LookupsController_customers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lookups/engineers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Active Service Engineers of the caller's company with open-job counts (G17)
+         * @description Paginated: `page` (default 1), `page_size` (default 25, max 100) -> { rows, total, page, page_size }. `search` = name/code; `ids` resolves known ids. Same eligibility as POST /jobs/:id/assign. Ordered by name.
+         */
+        get: operations["LookupsController_engineers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lookups/employees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Active employees of the caller's company, optionally by role (custodian / Sales hand-off / approver pickers)
+         * @description Paginated: `page` (default 1), `page_size` (default 25, max 100) -> { rows, total, page, page_size }. `role` = comma-separated role codes; `search` = name/code; `ids` resolves known ids. Ordered by name.
+         */
+        get: operations["LookupsController_employees"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lookups/assemblies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Assembly Master (`assemblies`, the id equipment groups take) (G19)
+         * @description Paginated: `page` (default 1), `page_size` (default 25, max 100) -> { rows, total, page, page_size }. `search` = code/name; `ids`; `status` defaults to PENDING_APPROVAL,APPROVED (what an equipment group accepts). The table is shared by both companies (no company_id). Not fdn_assembly_master.
+         */
+        get: operations["LookupsController_assemblies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lookups/custody-locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Active custody locations of the caller's company (G18)
+         * @description Paginated: `page` (default 1), `page_size` (default 25, max 100) -> { rows, total, page, page_size }. `search` = code/name; `ids`. Only active locations (expansion rejects inactive ones).
+         */
+        get: operations["LookupsController_custodyLocations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/lookups/item-bridge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Resolve item_bridge_id -> item code/name/UOM (C2-1) for stock-check, shortage, RFQ and PO lines
+         * @description Paginated: `page` (default 1), `page_size` (default 25, max 100) -> { rows, total, page, page_size }. `ids` and/or `search` (code/name) is required. Any approval status (a line may reference a since-delisted item).
+         */
+        get: operations["LookupsController_itemBridge"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/overview/purchase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * P0 overview metrics (G22) for the caller's company
+         * @description Raw counts only (no targets/denominators). "Today"/"this week" use the company timezone. Each field's exact definition is in the schema. Read-only transaction.
+         */
+        get: operations["PurchaseOverviewController_overview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3650,12 +3898,13 @@ export interface components {
             available_after: number;
             version: components["schemas"]["InventoryAvailabilityResponse"];
         };
-        ReserveDto: {
-            /**
-             * @description Reserved against the real ledger (fdn_reserve). One outward line later ships this whole reservation.
-             * @example 4
-             */
+        InventoryReserveDto: {
+            expires_at?: string;
+            company_id: string;
+            item_id: string;
+            uom: string;
             qty: number;
+            reference_id: string;
         };
         InventoryReservationResponse: {
             /**
@@ -3810,7 +4059,7 @@ export interface components {
             /** Format: date-time */
             created_at: string;
         };
-        InwardEquipmentUnitsRow: {
+        ReceiptEquipmentUnit: {
             /** Format: uuid */
             id: string;
             /** Format: uuid */
@@ -3839,6 +4088,13 @@ export interface components {
             current_custodian_id: string;
             /** Format: date-time */
             created_at: string;
+            /**
+             * Format: uuid
+             * @description service_jobs.id created when this unit was verified; null before
+             */
+            job_id: string | null;
+            /** @description service_jobs.job_number; null before verification */
+            job_number: string | null;
         };
         InwardReceiptDetail: {
             /** Format: uuid */
@@ -3881,7 +4137,7 @@ export interface components {
             /** @description Ordered by group_number */
             equipment_groups: components["schemas"]["InwardEquipmentGroupsRow"][];
             /** @description Ordered by group_id, unit_number */
-            equipment_units: components["schemas"]["InwardEquipmentUnitsRow"][];
+            equipment_units: components["schemas"]["ReceiptEquipmentUnit"][];
         };
         CreateEquipmentGroupDto: {
             assembly_id: string;
@@ -3891,6 +4147,36 @@ export interface components {
         ExpandEquipmentGroupDto: {
             location_id: string;
             custodian_id: string;
+        };
+        InwardEquipmentUnitsRow: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            company_id: string;
+            /** Format: uuid */
+            inward_id: string;
+            /** Format: uuid */
+            group_id: string;
+            unit_number: number;
+            unit_quantity: number;
+            serial_number: string | null;
+            observed_make: string | null;
+            observed_model: string | null;
+            reported_fault: string | null;
+            physical_condition: string | null;
+            accessories: string | null;
+            /** @enum {string} */
+            verification_status: "PENDING" | "VERIFIED" | "ON_HOLD" | "REJECTED";
+            /** Format: date-time */
+            verified_at: string | null;
+            /** Format: uuid */
+            verified_by_id: string | null;
+            /** Format: uuid */
+            current_location_id: string;
+            /** Format: uuid */
+            current_custodian_id: string;
+            /** Format: date-time */
+            created_at: string;
         };
         ExpandGroupResponse: {
             /** @description Units created by br02_expand_equipment_group() */
@@ -4624,6 +4910,61 @@ export interface components {
             reason_for_change: string | null;
             notes: string | null;
         };
+        RfqLineWithItem: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            rfq_id: string;
+            line_no: number;
+            /** Format: uuid */
+            item_bridge_id: string;
+            /**
+             * Format: decimal
+             * @description numeric, returned as decimal string
+             */
+            quantity: string;
+            uom: string;
+            technical_specification: string;
+            manufacturer_preference: string | null;
+            preference_reason: string | null;
+            /**
+             * Format: date-time
+             * @description date column, serialised as ISO timestamp
+             */
+            desired_delivery_by: string | null;
+            item_code: string | null;
+            item_name: string | null;
+        };
+        RfqLineSourceLink: {
+            /** Format: uuid */
+            rfq_line_id: string;
+            line_no: number;
+            /**
+             * Format: uuid
+             * @description br04_shortage_sources.id
+             */
+            shortage_source_id: string;
+            /** Format: decimal */
+            demand_quantity: string;
+            /** Format: uuid */
+            job_id: string;
+            /**
+             * Format: uuid
+             * @description br04_stock_check_lines.id
+             */
+            stock_check_line_id: string;
+            /**
+             * Format: uuid
+             * @description br04_stock_checks.id
+             */
+            stock_check_id: string;
+            /**
+             * Format: uuid
+             * @description br03_material_requests.id
+             */
+            material_request_id: string;
+            material_request_number: string;
+        };
         Br04RfqSupplierInvitesRow: {
             /** Format: uuid */
             id: string;
@@ -4757,7 +5098,15 @@ export interface components {
             reason_for_change: string | null;
             notes: string | null;
             /** @description Ordered by line_no */
-            lines: components["schemas"]["Br04RfqLinesRow"][];
+            lines: components["schemas"]["RfqLineWithItem"][];
+            /**
+             * Format: uuid
+             * @description The job the RFQ was raised from (RFQs are per job)
+             */
+            job_id: string | null;
+            job_number: string | null;
+            /** @description Shortage -> stock-check line -> stock check -> material request, per line */
+            sources: components["schemas"]["RfqLineSourceLink"][];
             invites: components["schemas"]["Br04RfqSupplierInvitesRow"][];
             offers: components["schemas"]["RfqOfferWithLines"][];
         };
@@ -4848,28 +5197,15 @@ export interface components {
             valid: boolean;
             reason?: string;
         };
-        QuoteLineDto: {
-            /** @description Saleable product from the Item Master (APPROVED/ACTIVE required at issue, 11A-04) */
-            item_id: string;
-            /** @description Defaults to the Item Master standard name */
-            description?: string;
-            manufacturer?: string;
-            part_number?: string;
-            specification?: string;
+        RepairQuoteLineDto: {
             /** @enum {string} */
-            product_condition: "NEW" | "REFURBISHED" | "REPAIRED" | "OTHER";
-            warranty?: string;
-            /** @description 11A-10: clearly-labelled alternative offer, e.g. "Alt A" */
-            alternative_label?: string;
-            /** @example 4 */
-            qty: number;
-            /**
-             * @description Final customer unit price, pre-tax, integer paise (typed by Purchase)
-             * @example 125000
-             */
-            unit_price_paise: number;
-            /** @description Optional list price (paise) to show a discount; >= unit price. No discount band is enforced (11A-05 pending). */
-            list_unit_price_paise?: number;
+            line_type: "REPAIR_SERVICE" | "MATERIAL" | "LABOUR" | "INSPECTION" | "TESTING" | "EXTERNAL" | "FREIGHT" | "OTHER";
+            line_description: string;
+            quantity: number;
+            uom: string;
+            net_unit_price_pre_tax: number;
+            scope_technically_indivisible?: boolean;
+            customer_selectable?: boolean;
         };
         CreateQuoteDto: {
             /** @enum {string} */
@@ -4883,7 +5219,7 @@ export interface components {
             terms_snapshot?: string;
             inspection_fee_pre_tax?: number;
             inspection_fee_agreement_ref?: string;
-            lines: components["schemas"]["QuoteLineDto"][];
+            lines: components["schemas"]["RepairQuoteLineDto"][];
         };
         Br04CustomerQuoteRevisionsRow: {
             /** Format: uuid */
@@ -5118,16 +5454,20 @@ export interface components {
             inspection_fee_agreement_ref?: string;
             higher_discount_approved_by_id?: string;
             higher_discount_reason?: string;
-            lines: components["schemas"]["QuoteLineDto"][];
+            lines: components["schemas"]["RepairQuoteLineDto"][];
         };
         ReleaseToSalesDto: {
             assigned_sales_id: string;
         };
-        QuoteResponseDto: {
+        RepairQuoteResponseDto: {
+            br04_quote_revision_id: string;
             /** @enum {string} */
-            response_kind: "ENQUIRY" | "NEGOTIATING" | "ACCEPTED" | "PART_ACCEPTED" | "REJECTED" | "NO_RESPONSE";
-            notes?: string;
-            response_evidence_uri?: string;
+            response_type: "AWAITING_RESPONSE" | "ACCEPTED" | "COUNTER_OFFER" | "TECHNICAL_QUERY" | "PARTIAL_ACCEPTANCE" | "ON_HOLD" | "REJECTED" | "EXPIRED";
+            /** @enum {string} */
+            response_channel?: "EMAIL" | "WHATSAPP" | "CALL" | "IN_PERSON" | "OTHER";
+            customer_contact?: string;
+            response_notes?: string;
+            evidence_uri?: string;
         };
         Br05CustomerResponseEventsRow: {
             /** Format: uuid */
@@ -8024,11 +8364,11 @@ export interface components {
             feedback: components["schemas"]["Br09VFeedbackRow"] | null;
             sla: Record<string, never>[];
         };
-        AuthorityStatus: {
+        SupportAuthorityStatus: {
             /** @enum {string} */
-            authority_kind: "FINANCIAL_GRANT" | "CROSS_COMPANY_GRANT";
+            decision_kind: "CLAIM_DECISION" | "GOODWILL_APPROVAL";
             approver_role_code: string | null;
-            /** @example CLIENT-UNCONFIRMED (restricted grants blocked) */
+            /** @example CLIENT-UNCONFIRMED (decisions blocked) */
             status: string;
             note: string | null;
             /** Format: date-time */
@@ -8050,7 +8390,7 @@ export interface components {
             updated_at: string;
         };
         Br09Config: {
-            authorities: components["schemas"]["AuthorityStatus"][];
+            authorities: components["schemas"]["SupportAuthorityStatus"][];
             sla_targets: components["schemas"]["Br09SlaTargetsRow"][];
         };
         AuthorityConfigDto: {
@@ -8312,6 +8652,16 @@ export interface components {
         CreateSalesAssignmentDto: {
             employee_id: string;
             customer_id: string;
+        };
+        AuthorityStatus: {
+            /** @enum {string} */
+            authority_kind: "FINANCIAL_GRANT" | "CROSS_COMPANY_GRANT";
+            approver_role_code: string | null;
+            /** @example CLIENT-UNCONFIRMED (restricted grants blocked) */
+            status: string;
+            note: string | null;
+            /** Format: date-time */
+            updated_at: string | null;
         };
         AuthorityDto: {
             /** @enum {string} */
@@ -8647,6 +8997,29 @@ export interface components {
             /** @description Required for every revision after the first */
             revision_reason: string;
         };
+        QuoteLineDto: {
+            /** @description Saleable product from the Item Master (APPROVED/ACTIVE required at issue, 11A-04) */
+            item_id: string;
+            /** @description Defaults to the Item Master standard name */
+            description?: string;
+            manufacturer?: string;
+            part_number?: string;
+            specification?: string;
+            /** @enum {string} */
+            product_condition: "NEW" | "REFURBISHED" | "REPAIRED" | "OTHER";
+            warranty?: string;
+            /** @description 11A-10: clearly-labelled alternative offer, e.g. "Alt A" */
+            alternative_label?: string;
+            /** @example 4 */
+            qty: number;
+            /**
+             * @description Final customer unit price, pre-tax, integer paise (typed by Purchase)
+             * @example 125000
+             */
+            unit_price_paise: number;
+            /** @description Optional list price (paise) to show a discount; >= unit price. No discount band is enforced (11A-05 pending). */
+            list_unit_price_paise?: number;
+        };
         Br11QuoteLinesRow: {
             /** Format: uuid */
             id: string;
@@ -8695,6 +9068,12 @@ export interface components {
             /** @example buyer@customer.example */
             recipient: string;
             document_evidence_uri?: string;
+        };
+        QuoteResponseDto: {
+            /** @enum {string} */
+            response_kind: "ENQUIRY" | "NEGOTIATING" | "ACCEPTED" | "PART_ACCEPTED" | "REJECTED" | "NO_RESPONSE";
+            notes?: string;
+            response_evidence_uri?: string;
         };
         OrderLineDto: {
             quote_line_id: string;
@@ -9044,6 +9423,13 @@ export interface components {
             br08_receipt_id: string;
             finance_confirmation_reference: string;
         };
+        ReserveDto: {
+            /**
+             * @description Reserved against the real ledger (fdn_reserve). One outward line later ships this whole reservation.
+             * @example 4
+             */
+            qty: number;
+        };
         ReservationResult: {
             /** Format: uuid */
             id: string;
@@ -9322,6 +9708,487 @@ export interface components {
              * @example /api/uploads/0b9f…
              */
             file_uri: string;
+        };
+        ReceiptListRow: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            company_id: string;
+            jin_number: string;
+            /** Format: uuid */
+            customer_id: string;
+            customer_status_snapshot: string;
+            /** Format: date-time */
+            receipt_at: string;
+            /** @enum {string} */
+            receipt_channel: "WALK_IN" | "COURIER";
+            /** Format: uuid */
+            received_by_id: string;
+            customer_dc_number: string | null;
+            /**
+             * Format: date-time
+             * @description date column, serialised as ISO timestamp
+             */
+            dc_date: string | null;
+            /** @enum {string} */
+            dc_exception_status: "NONE" | "PENDING" | "RESOLVED" | "REJECTED";
+            dc_exception_reason: string | null;
+            courier_name: string | null;
+            courier_awb: string | null;
+            declared_quantity: number | null;
+            /** @enum {string} */
+            priority: "NORMAL" | "URGENT" | "CRITICAL";
+            priority_reason: string | null;
+            /** @enum {string} */
+            receipt_status: "REGISTERED" | "VERIFYING" | "VERIFIED" | "ON_HOLD" | "REJECTED" | "CLOSED";
+            fiscal_year: string | null;
+            notes: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+            customer_code: string;
+            customer_name: string;
+            /** @description Equipment groups on the JIN */
+            groups_count: number;
+            /** @description SUM(inward_equipment_groups.quantity_received): units declared on the groups (counted before expansion) */
+            units_received: number;
+            /** @description Expanded unit rows (inward_equipment_units) */
+            units_total: number;
+            /** @description Unit rows with verification_status='VERIFIED' (each has a Job ID) */
+            units_verified: number;
+        };
+        ReceiptListPage: {
+            /** @description Rows matching the filters (all pages) */
+            total: number;
+            page: number;
+            page_size: number;
+            /** @description Newest receipt_at first */
+            rows: components["schemas"]["ReceiptListRow"][];
+        };
+        JobListRow: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            company_id: string;
+            /** Format: uuid */
+            inward_id: string;
+            /** Format: uuid */
+            unit_id: string;
+            job_number: string;
+            /** @enum {string} */
+            status: "JOB_CREATED" | "AWAITING_ASSIGNMENT" | "ASSIGNED" | "ACCEPTED" | "INSPECTION" | "ON_HOLD" | "CANCELLED" | "CLOSED";
+            /** @enum {string} */
+            priority: "NORMAL" | "URGENT" | "CRITICAL";
+            /** @enum {string} */
+            route: "IN_HOUSE" | "EXTERNAL" | "ONSITE_LINKED";
+            /** Format: date-time */
+            released_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            closed_at: string | null;
+            /** Format: date-time */
+            cancelled_at: string | null;
+            cancel_reason: string | null;
+            jin_number: string;
+            /** Format: date-time */
+            receipt_at: string;
+            /** @description Unit number within its equipment group */
+            unit_number: number;
+            /** @description Units in that equipment group */
+            units_in_group: number;
+            serial_number: string | null;
+            observed_make: string | null;
+            observed_model: string | null;
+            /**
+             * Format: uuid
+             * @description assemblies.id
+             */
+            assembly_id: string;
+            assembly_code: string;
+            assembly_name: string;
+            /** Format: uuid */
+            customer_id: string;
+            customer_code: string;
+            customer_name: string;
+            /**
+             * Format: uuid
+             * @description Current job_assignments row, null if unassigned
+             */
+            current_assignment_id: string | null;
+            /** Format: uuid */
+            current_engineer_id: string | null;
+            /** @description employees.full_name of the current engineer */
+            current_engineer_name: string | null;
+            /**
+             * @description Current assignment response (PENDING = custody not yet acknowledged)
+             * @enum {string|null}
+             */
+            assignment_response: "PENDING" | "ACCEPTED" | "DECLINED" | "REASSIGNED" | null;
+            /** Format: date-time */
+            assigned_at: string | null;
+            /**
+             * Format: date-time
+             * @description Latest of: job created/closed/cancelled, current assignment assigned/responded, and any activity_audit_log row whose entity_id is the job or whose after_state has a top-level job_id equal to the job.
+             */
+            last_activity_at: string;
+        };
+        JobListPage: {
+            /** @description Rows matching the filters (all pages) */
+            total: number;
+            page: number;
+            page_size: number;
+            /** @description Newest job first */
+            rows: components["schemas"]["JobListRow"][];
+        };
+        JobProgressStage: {
+            /** @enum {string} */
+            key: "ASSIGNED" | "CUSTODY" | "INSPECTION" | "REPORT_REVIEW" | "MATERIAL" | "QUOTE" | "AUTHORISATION" | "PO_GRN" | "REPAIR_TEST" | "DISPATCH_INVOICE";
+            label: string;
+            /**
+             * @description done = the stage's completion is recorded (see `rule`). current = first not-done stage after the last done one. blocked = that current stage while the job is ON_HOLD/CANCELLED, or REPAIR_TEST after a BR-07 STOP review. pending = anything else (including earlier stages with no record, e.g. no supplier PO because stock covered it). A CLOSED job has no current stage.
+             * @enum {string}
+             */
+            status: "done" | "current" | "pending" | "blocked";
+            /**
+             * Format: date-time
+             * @description When the stage completed (done) or started (in progress); null if nothing recorded
+             */
+            at: string | null;
+            /** @description Table(s) the stage is derived from */
+            source: string;
+            /** @description The exact derivation rule */
+            rule: string;
+            /** @description Recorded state, e.g. report status, quote number + status, DC/invoice numbers */
+            detail: string | null;
+        };
+        JobAssignmentHistoryRow: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            company_id: string;
+            /** Format: uuid */
+            job_id: string;
+            /** Format: uuid */
+            assigned_by_id: string;
+            /** Format: uuid */
+            engineer_id: string;
+            /** Format: date-time */
+            assigned_at: string;
+            is_current: boolean;
+            /** @enum {string} */
+            response: "PENDING" | "ACCEPTED" | "DECLINED" | "REASSIGNED";
+            /** Format: date-time */
+            responded_at: string | null;
+            response_reason: string | null;
+            reassignment_reason: string | null;
+            engineer_name: string;
+            assigned_by_name: string;
+        };
+        JobProgress: {
+            /** Format: uuid */
+            job_id: string;
+            job_number: string;
+            job_status: string;
+            /** @description key of the current (or blocked) stage; null if none */
+            current_stage: string | null;
+            /** @description Always 10 stages in this order */
+            stages: components["schemas"]["JobProgressStage"][];
+            /** @description Every job_assignments row for the job, oldest first */
+            assignments: components["schemas"]["JobAssignmentHistoryRow"][];
+        };
+        UpdateEquipmentUnitDto: {
+            /** @description Serial number. null or "" clears it. */
+            serial_number?: string | null;
+            /** @description Make as observed at inward. null or "" clears it. */
+            observed_make?: string | null;
+            /** @description Model as observed at inward. null or "" clears it. */
+            observed_model?: string | null;
+            /** @description Fault reported by the customer. null or "" clears it. */
+            reported_fault?: string | null;
+            /** @description Physical condition at inward. null or "" clears it. */
+            physical_condition?: string | null;
+            /** @description Accessories received with the unit. null or "" clears it. */
+            accessories?: string | null;
+        };
+        RfqListRow: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            company_id: string;
+            /**
+             * Format: int64
+             * @description bigint, returned as string
+             */
+            rfq_seq: string;
+            rfq_number: string | null;
+            revision_no: number;
+            /** @enum {string} */
+            rfq_status: "DRAFT" | "SENT" | "OFFERS_RECEIVED" | "COMPARED" | "CANCELLED" | "EXPIRED";
+            /** Format: uuid */
+            created_by_id: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            sent_at: string | null;
+            reason_for_change: string | null;
+            notes: string | null;
+            /**
+             * Format: uuid
+             * @description The job whose shortages the RFQ was raised from (RFQs are per job)
+             */
+            job_id: string | null;
+            job_number: string | null;
+            customer_name: string | null;
+            lines_count: number;
+            /** @description br04_rfq_supplier_invites rows */
+            invites_count: number;
+            /** @description br04_supplier_offer_headers rows (offers recorded) */
+            offers_count: number;
+        };
+        RfqListPage: {
+            /** @description Rows matching the filters (all pages) */
+            total: number;
+            page: number;
+            page_size: number;
+            /** @description Newest first. No supplier prices are included. */
+            rows: components["schemas"]["RfqListRow"][];
+        };
+        QuoteListRow: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            company_id: string;
+            /** Format: uuid */
+            job_id: string;
+            /** Format: uuid */
+            estimate_id: string;
+            quote_number: string;
+            /** Format: uuid */
+            created_by_id: string;
+            /** Format: date-time */
+            created_at: string;
+            /** @enum {string} */
+            quote_type: "ITEM" | "ASSEMBLED";
+            job_number: string;
+            job_status: string;
+            /** Format: uuid */
+            customer_id: string;
+            customer_name: string;
+            revisions_count: number;
+            /** Format: uuid */
+            latest_revision_id: string;
+            latest_revision_no: number;
+            /** @enum {string} */
+            latest_quote_status: "DRAFT" | "RELEASED_TO_SALES" | "SENT" | "ACCEPTED" | "REJECTED" | "EXPIRED" | "SUPERSEDED";
+            /**
+             * Format: decimal
+             * @description Latest revision revised_pre_tax (customer price, rupees numeric)
+             */
+            latest_revised_pre_tax: string;
+            /** Format: decimal */
+            latest_tax_total: string;
+            /** Format: decimal */
+            latest_freight_charge: string;
+            latest_currency_code: string;
+            /** Format: date */
+            latest_valid_until: string | null;
+            /** Format: date-time */
+            latest_revision_at: string;
+        };
+        QuoteListPage: {
+            /** @description Rows matching the filters (all pages) */
+            total: number;
+            page: number;
+            page_size: number;
+            /** @description Newest latest-revision first. No supplier offer references or costs. */
+            rows: components["schemas"]["QuoteListRow"][];
+        };
+        CustomerLookupRow: {
+            /** Format: uuid */
+            id: string;
+            customer_code: string;
+            customer_name: string;
+            /** @enum {string} */
+            status: "PENDING_APPROVAL" | "APPROVED" | "INACTIVE" | "REJECTED";
+        };
+        CustomerLookupPage: {
+            /** @description Rows matching the filters (all pages) */
+            total: number;
+            page: number;
+            page_size: number;
+            rows: components["schemas"]["CustomerLookupRow"][];
+        };
+        EngineerLookupRow: {
+            /** Format: uuid */
+            id: string;
+            employee_code: string;
+            full_name: string;
+            /** @description Jobs not CLOSED/CANCELLED whose current assignment is this engineer */
+            open_jobs: number;
+            /** @description Of those, assignments still PENDING (custody not acknowledged) */
+            pending_custody: number;
+        };
+        EngineerLookupPage: {
+            /** @description Rows matching the filters (all pages) */
+            total: number;
+            page: number;
+            page_size: number;
+            rows: components["schemas"]["EngineerLookupRow"][];
+        };
+        EmployeeLookupRow: {
+            /** Format: uuid */
+            id: string;
+            employee_code: string;
+            full_name: string;
+            role_code: string;
+        };
+        EmployeeLookupPage: {
+            /** @description Rows matching the filters (all pages) */
+            total: number;
+            page: number;
+            page_size: number;
+            rows: components["schemas"]["EmployeeLookupRow"][];
+        };
+        AssemblyLookupRow: {
+            /**
+             * Format: uuid
+             * @description assemblies.id (customer equipment master, the id equipment groups take)
+             */
+            id: string;
+            assembly_code: string;
+            assembly_name: string;
+            /** @enum {string} */
+            status: "PENDING_APPROVAL" | "APPROVED" | "INACTIVE" | "REJECTED";
+            repairable: boolean;
+        };
+        AssemblyLookupPage: {
+            /** @description Rows matching the filters (all pages) */
+            total: number;
+            page: number;
+            page_size: number;
+            rows: components["schemas"]["AssemblyLookupRow"][];
+        };
+        CustodyLocationLookupRow: {
+            /** Format: uuid */
+            id: string;
+            location_code: string;
+            location_name: string;
+            /** @description Equipment units currently at this location */
+            units_here: number;
+        };
+        CustodyLocationLookupPage: {
+            /** @description Rows matching the filters (all pages) */
+            total: number;
+            page: number;
+            page_size: number;
+            rows: components["schemas"]["CustodyLocationLookupRow"][];
+        };
+        ItemBridgeLookupRow: {
+            /**
+             * Format: uuid
+             * @description br03_item_catalog_bridge.id (the item_bridge_id on MR / stock-check / shortage / RFQ / PO lines)
+             */
+            item_bridge_id: string;
+            /**
+             * Format: uuid
+             * @description fdn_item_master.id
+             */
+            br01_item_id: string;
+            item_code: string;
+            item_name: string;
+            uom: string;
+            /** @enum {string} */
+            approval_status: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "INACTIVE";
+            is_active: boolean;
+        };
+        ItemBridgeLookupPage: {
+            /** @description Rows matching the filters (all pages) */
+            total: number;
+            page: number;
+            page_size: number;
+            rows: components["schemas"]["ItemBridgeLookupRow"][];
+        };
+        OverviewVerifyUnits: {
+            /** @description inward_equipment_units with verification_status='PENDING' (expanded, not yet verified) */
+            awaiting: number;
+            /** @description JINs that have at least one such unit */
+            receipts_with_pending_units: number;
+            /** @description Units whose verified_at falls on today (company timezone) */
+            verified_today: number;
+        };
+        OverviewAssign: {
+            /** @description Jobs not CLOSED/CANCELLED with no current job_assignments row */
+            unassigned: number;
+            /** @description job_assignments rows created today (company timezone), reassignments included */
+            assigned_today: number;
+        };
+        OverviewReviewReports: {
+            /** @description br03_inspection_reports with status='SUBMITTED' (awaiting Purchase accept/return) */
+            awaiting_review: number;
+            /** @description br03_inspection_reports with status='RETURNED' (back with the engineer) */
+            returned: number;
+            /** @description br03_inspection_reviews (ACCEPT or RETURN) recorded today (company timezone) */
+            reviewed_today: number;
+        };
+        OverviewStatusCount: {
+            status: string;
+            count: number;
+        };
+        OverviewEngineerLoad: {
+            /** Format: uuid */
+            engineer_id: string;
+            employee_code: string;
+            full_name: string;
+            /** @description Jobs not CLOSED/CANCELLED whose current assignment is this engineer */
+            open_jobs: number;
+            /** @description Of those, assignments still PENDING (custody not acknowledged) */
+            pending_custody: number;
+        };
+        OverviewIntakeDay: {
+            /** Format: date */
+            date: string;
+            /** @enum {string} */
+            weekday: "MON" | "TUE" | "WED" | "THU" | "FRI" | "SAT";
+            /** @description SUM(quantity_received) of equipment groups on JINs whose receipt_at falls on this day */
+            units_received: number;
+            /** @description Units whose verified_at falls on this day */
+            units_verified: number;
+        };
+        OverviewActivity: {
+            /** @description activity_audit_log.id (bigint as string) */
+            id: string;
+            /** Format: date-time */
+            changed_at: string;
+            /** Format: uuid */
+            actor_id: string | null;
+            actor_name: string | null;
+            action: string;
+            entity_table: string;
+            /** Format: uuid */
+            entity_id: string;
+        };
+        PurchaseOverview: {
+            /** Format: date-time */
+            as_of: string;
+            /** @description Company timezone used for 'today' and the week (active working calendar; default Asia/Kolkata) */
+            timezone: string;
+            /** Format: date */
+            today: string;
+            verify_units: components["schemas"]["OverviewVerifyUnits"];
+            assign_engineers: components["schemas"]["OverviewAssign"];
+            review_reports: components["schemas"]["OverviewReviewReports"];
+            /** @description One entry per open service_jobs.status (all but CLOSED/CANCELLED), zeros included */
+            jobs_by_status: components["schemas"]["OverviewStatusCount"][];
+            /** @description Active ENGINEER employees, most open jobs first, max 50 */
+            engineer_workload: components["schemas"]["OverviewEngineerLoad"][];
+            /** @description Active ENGINEER employees in the company (engineer_workload is capped at 50) */
+            engineers_total: number;
+            /** @description Mon..Sat of the current week (company timezone) */
+            intake_this_week: components["schemas"]["OverviewIntakeDay"][];
+            /** @description Latest 10 activity_audit_log rows of the company. before/after state is NOT returned. */
+            latest_activity: components["schemas"]["OverviewActivity"][];
         };
     };
     responses: never;
@@ -10073,7 +10940,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ReserveDto"];
+                "application/json": components["schemas"]["InventoryReserveDto"];
             };
         };
         responses: {
@@ -10430,6 +11297,72 @@ export interface operations {
             };
         };
     };
+    PurchaseDeskBr02Controller_listReceipts: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Case-insensitive substring match (see each endpoint for the fields searched) */
+                search?: string;
+                /** @description inward_receipts.receipt_status. One or more of: REGISTERED, VERIFYING, VERIFIED, ON_HOLD, REJECTED, CLOSED (comma-separated). Omitted = all. */
+                status?: "REGISTERED" | "VERIFYING" | "VERIFIED" | "ON_HOLD" | "REJECTED" | "CLOSED";
+                /** @description inward_receipts.priority. One or more of: NORMAL, URGENT, CRITICAL (comma-separated). Omitted = all. */
+                priority?: "NORMAL" | "URGENT" | "CRITICAL";
+                /** @description Calendar month of receipt_at (YYYY-MM) in the company timezone */
+                month?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceiptListPage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: PURCHASE | MANAGEMENT */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     Br02Controller_createReceipt: {
         parameters: {
             query?: never;
@@ -10641,6 +11574,54 @@ export interface operations {
             };
             /** @description Requires role: PURCHASE */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    PurchaseDeskBr02Controller_unitPhotos: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EquipmentPhotosRow"][];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -13118,7 +14099,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["QuoteResponseDto"];
+                "application/json": components["schemas"]["RepairQuoteResponseDto"];
             };
         };
         responses: {
@@ -22064,6 +23045,733 @@ export interface operations {
             };
             /** @description Referenced record not found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    PurchaseDeskBr02Controller_listJobs: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Case-insensitive substring match (see each endpoint for the fields searched) */
+                search?: string;
+                /** @description service_jobs.status. One or more of: JOB_CREATED, AWAITING_ASSIGNMENT, ASSIGNED, ACCEPTED, INSPECTION, ON_HOLD, CANCELLED, CLOSED (comma-separated). Omitted = all. */
+                status?: "JOB_CREATED" | "AWAITING_ASSIGNMENT" | "ASSIGNED" | "ACCEPTED" | "INSPECTION" | "ON_HOLD" | "CANCELLED" | "CLOSED";
+                /** @description service_jobs.priority. One or more of: NORMAL, URGENT, CRITICAL (comma-separated). Omitted = all. */
+                priority?: "NORMAL" | "URGENT" | "CRITICAL";
+                /** @description Current engineer (employees.id), or the literal `unassigned` for jobs with no current assignment */
+                engineer_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobListPage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: PURCHASE | MANAGEMENT */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    PurchaseDeskBr02Controller_progress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobProgress"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: PURCHASE | MANAGEMENT */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    PurchaseDeskBr02Controller_updateUnit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateEquipmentUnitDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InwardEquipmentUnitsRow"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: PURCHASE */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    PurchaseDeskBr04Controller_listRfqs: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Case-insensitive substring match (see each endpoint for the fields searched) */
+                search?: string;
+                /** @description br04_rfqs.rfq_status. One or more of: DRAFT, SENT, OFFERS_RECEIVED, COMPARED, CANCELLED, EXPIRED (comma-separated). Omitted = all. */
+                status?: "DRAFT" | "SENT" | "OFFERS_RECEIVED" | "COMPARED" | "CANCELLED" | "EXPIRED";
+                /** @description Only RFQs raised from this job */
+                job_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RfqListPage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: PURCHASE */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    PurchaseDeskBr04Controller_listQuotes: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Case-insensitive substring match (see each endpoint for the fields searched) */
+                search?: string;
+                /** @description Latest revision's br04_customer_quote_revisions.quote_status. One or more of: DRAFT, RELEASED_TO_SALES, SENT, ACCEPTED, REJECTED, EXPIRED, SUPERSEDED (comma-separated). Omitted = all. */
+                status?: "DRAFT" | "RELEASED_TO_SALES" | "SENT" | "ACCEPTED" | "REJECTED" | "EXPIRED" | "SUPERSEDED";
+                /** @description Only quotes of this job */
+                job_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QuoteListPage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: PURCHASE | MANAGEMENT */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    LookupsController_customers: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Case-insensitive substring match (see each endpoint for the fields searched) */
+                search?: string;
+                /** @description Only these ids (comma-separated UUIDs, max 100). Combine with search/status as an AND. */
+                ids?: string;
+                /** @description customers.status (comma-separated; one or more of PENDING_APPROVAL, APPROVED, INACTIVE, REJECTED). Default PENDING_APPROVAL,APPROVED = the statuses a JIN accepts (br02_receipt_master_guard). */
+                status?: "PENDING_APPROVAL" | "APPROVED" | "INACTIVE" | "REJECTED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerLookupPage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: PURCHASE | SALES */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    LookupsController_engineers: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Case-insensitive substring match (see each endpoint for the fields searched) */
+                search?: string;
+                /** @description Only these ids (comma-separated UUIDs, max 100). Combine with search/status as an AND. */
+                ids?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EngineerLookupPage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: PURCHASE */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    LookupsController_employees: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Case-insensitive substring match (see each endpoint for the fields searched) */
+                search?: string;
+                /** @description Only these ids (comma-separated UUIDs, max 100). Combine with search/status as an AND. */
+                ids?: string;
+                /** @description employees.role_code. One or more of: PURCHASE, ENGINEER, SALES, STORES_QUALITY, EXTERNAL_COORD, FINANCE, MANAGEMENT, SYSTEM_ADMIN (comma-separated). Omitted = all. */
+                role?: "PURCHASE" | "ENGINEER" | "SALES" | "STORES_QUALITY" | "EXTERNAL_COORD" | "FINANCE" | "MANAGEMENT" | "SYSTEM_ADMIN";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployeeLookupPage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: PURCHASE */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    LookupsController_assemblies: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Case-insensitive substring match (see each endpoint for the fields searched) */
+                search?: string;
+                /** @description Only these ids (comma-separated UUIDs, max 100). Combine with search/status as an AND. */
+                ids?: string;
+                /** @description assemblies.status (comma-separated; one or more of PENDING_APPROVAL, APPROVED, INACTIVE, REJECTED). Default PENDING_APPROVAL,APPROVED = the statuses an equipment group accepts (br02_group_assembly_guard). */
+                status?: "PENDING_APPROVAL" | "APPROVED" | "INACTIVE" | "REJECTED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssemblyLookupPage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: PURCHASE */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    LookupsController_custodyLocations: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Case-insensitive substring match (see each endpoint for the fields searched) */
+                search?: string;
+                /** @description Only these ids (comma-separated UUIDs, max 100). Combine with search/status as an AND. */
+                ids?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustodyLocationLookupPage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: PURCHASE */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    LookupsController_itemBridge: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Case-insensitive substring match (see each endpoint for the fields searched) */
+                search?: string;
+                /** @description Only these ids (comma-separated UUIDs, max 100). Combine with search/status as an AND. */
+                ids?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemBridgeLookupPage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: PURCHASE */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    PurchaseOverviewController_overview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseOverview"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: PURCHASE | MANAGEMENT */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

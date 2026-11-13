@@ -3,7 +3,7 @@
 // ?q=<quoteId> picks the quote (Q1 links land here via /p/quotes/:quoteId); ?revise=1 opens "Create revision".
 // Four states: loading (skeleton in the lines card), error (StateCard + retry), empty (no quote yet → Start quote),
 // success (builder / locked view).
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { IconFileInvoice, IconFileUnknown } from '@tabler/icons-react';
 import { useQuote, useQuotes } from '../api';
@@ -14,7 +14,7 @@ import { Button, EmptyState, ErrorState, Ic, SkeletonRows, StateCard, Tab, TabBa
 import { apiStatus } from '../../../api/http';
 import { IconPlus } from '@tabler/icons-react';
 import { QuoteBuilder, type Flash } from './QuoteBuilder';
-import { rememberQuote, useQuoteResponses, type QuoteResponse } from './api';
+import { useQuoteResponses, type QuoteResponse } from './api';
 
 function QuoteSkeleton() {
   return (
@@ -104,7 +104,6 @@ function QuoteLoader({ quoteId, startRevise, responses, canWork, canSeeCost, fla
 }) {
   const { job } = useJobWorkspace();
   const q = useQuote(quoteId);
-  useEffect(() => { if (q.data) rememberQuote(q.data.id); }, [q.data]);
 
   if (q.isPending) return <QuoteSkeleton />;
   if (q.isError) {

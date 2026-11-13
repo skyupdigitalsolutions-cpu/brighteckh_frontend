@@ -5,13 +5,18 @@
 // subtle button with 20px x (primary).
 // Body: px-28 pt-4 pb-20, gap 18, scrolls. Footer: 1px top border-default, pt-20 px-28 pb-28, gap 12; buttons
 // flex-1 (e.g. Cancel secondary + primary action).
+//
+// variant="side" — the 480-wide drawer of D·P2a 177:103185 / D·P2b 177:103290 (assign engineer etc.): no border,
+// shadow -12 0 40 rgba(26,13,13,.18); header pt-24 px-24 pb-16 (titles gap 2); body pt-8 px-24 pb-16 gap 16;
+// footer 1px top border-default, pt-16 px-24 pb-24, children stacked (flex-col, items-start, gap 12 → buttons hug).
+// Same scrim (.55), 12px viewport inset and radius 28. Replaces inward/detail/local.tsx SideDrawer.
 import { useEffect, type FormEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { IconX } from '@tabler/icons-react';
 import { cx, Ic } from './Icon';
 import { Scrim, useDismiss } from './Popover';
 
-export function Drawer({ open, onClose, title, subtitle, children, footer, onSubmit, width = 520, busy }: {
+export function Drawer({ open, onClose, title, subtitle, children, footer, onSubmit, width, busy, variant = 'default' }: {
   open: boolean;
   onClose: () => void;
   title: ReactNode;
@@ -23,7 +28,11 @@ export function Drawer({ open, onClose, title, subtitle, children, footer, onSub
   width?: number;
   /** While true, Escape / scrim clicks don't close (a mutation is in flight). */
   busy?: boolean;
+  /** 'default' = 520 P1 drawer (177:108447); 'side' = 480 P2a/P2b drawer (177:103185 / 177:103290). */
+  variant?: 'default' | 'side';
 }) {
+  const side = variant === 'side';
+  const w = width ?? (side ? 480 : 520);
   const close = () => { if (!busy) onClose(); };
   useDismiss(open, close);
   useEffect(() => {
@@ -36,8 +45,8 @@ export function Drawer({ open, onClose, title, subtitle, children, footer, onSub
 
   const inner = (
     <>
-      <div className="flex w-full shrink-0 items-start gap-[12px] overflow-clip px-[28px] pb-[20px] pt-[28px]">
-        <div className="flex min-w-0 flex-1 flex-col gap-[4px]">
+      <div className={cx('flex w-full shrink-0 items-start gap-[12px] overflow-clip', side ? 'px-[24px] pb-[16px] pt-[24px]' : 'px-[28px] pb-[20px] pt-[28px]')}>
+        <div className={cx('flex min-w-0 flex-1 flex-col', side ? 'gap-[2px]' : 'gap-[4px]')}>
           <h2 className="text-[22px] font-semibold leading-[28px] text-fg">{title}</h2>
           {subtitle && <p className="text-[14px] leading-[20px] text-fg-2">{subtitle}</p>}
         </div>
@@ -50,16 +59,30 @@ export function Drawer({ open, onClose, title, subtitle, children, footer, onSub
           <Ic icon={IconX} size={20} />
         </button>
       </div>
-      <div className="flex min-h-0 w-full flex-1 flex-col gap-[18px] overflow-y-auto px-[28px] pb-[20px] pt-[4px]">{children}</div>
-      {footer && (
+      <div
+        className={cx(
+          'flex min-h-0 w-full flex-1 flex-col overflow-y-auto',
+          side ? 'items-stretch gap-[16px] px-[24px] pb-[16px] pt-[8px]' : 'gap-[18px] px-[28px] pb-[20px] pt-[4px]',
+        )}
+      >
+        {children}
+      </div>
+      {footer && (side ? (
+        <div className="flex w-full shrink-0 flex-col items-start gap-[12px] overflow-clip border-t border-line px-[24px] pb-[24px] pt-[16px]">
+          {footer}
+        </div>
+      ) : (
         <div className="flex w-full shrink-0 items-start gap-[12px] overflow-clip border-t border-line px-[28px] pb-[28px] pt-[20px] [&>*]:min-w-px [&>*]:flex-1">
           {footer}
         </div>
-      )}
+      ))}
     </>
   );
 
-  const panelCls = 'fixed bottom-[12px] right-[12px] top-[12px] z-50 flex max-w-[calc(100vw-24px)] flex-col items-stretch overflow-clip rounded-t-card border border-glass-border bg-surface';
+  const panelCls = cx(
+    'fixed bottom-[12px] right-[12px] top-[12px] z-50 flex max-w-[calc(100vw-24px)] flex-col items-stretch overflow-clip rounded-t-card bg-surface',
+    side ? 'shadow-[-12px_0px_40px_0px_rgba(26,13,13,0.18)]' : 'border border-glass-border',
+  );
   return createPortal(
     <>
       <Scrim alpha={0.55} onClick={close} />
@@ -68,7 +91,7 @@ export function Drawer({ open, onClose, title, subtitle, children, footer, onSub
           role="dialog"
           aria-modal="true"
           className={panelCls}
-          style={{ width }}
+          style={{ width: w }}
           onClick={(e) => e.stopPropagation()}
           onSubmit={(e: FormEvent) => { e.preventDefault(); onSubmit(); }}
           noValidate
@@ -76,7 +99,7 @@ export function Drawer({ open, onClose, title, subtitle, children, footer, onSub
           {inner}
         </form>
       ) : (
-        <div role="dialog" aria-modal="true" className={cx(panelCls)} style={{ width }} onClick={(e) => e.stopPropagation()}>{inner}</div>
+        <div role="dialog" aria-modal="true" className={cx(panelCls)} style={{ width: w }} onClick={(e) => e.stopPropagation()}>{inner}</div>
       )}
     </>,
     document.body,

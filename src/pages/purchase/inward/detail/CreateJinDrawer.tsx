@@ -2,16 +2,15 @@
 // Body 177:108454: Customer* (picker slot) · Received at* + Declared quantity · Channel* chips · Customer DC no. +
 // DC date · Priority chips · Notes. Footer: Cancel (secondary) + "Save & add equipment" (primary).
 // POST /inward-receipts (CreateInwardReceiptDto). The JIN number is allocated by the DB — never sent.
-// G16: no customers lookup → the Customer slot takes the customer UUID (mono) + GapNote.
+// Customer = kit LookupPicker over GET /lookups/customers (customerSource: PENDING_APPROVAL + APPROVED).
 // COURIER adds Courier name / AWB (DTO fields; the frame draws them only in the JIN header). URGENT / CRITICAL add
 // the optional priority_reason (DTO field). Whether either is required is the DB's call — its message is shown.
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Button, ChoiceChips, DateField, Drawer, FieldRow, FormErrors, GapNote, NumberInput, TextInput,
+  Button, ChoiceChips, DateField, Drawer, FieldRow, FormErrors, LookupPicker, NumberInput, TextInput,
 } from '../../../../ui/desktop';
-import { useCreateReceipt, type CreateReceiptBody } from '../../api';
-import { isUuid } from './local';
+import { customerSource, useCreateReceipt, type CreateReceiptBody } from '../../api';
 
 type Channel = CreateReceiptBody['receipt_channel'];
 type Priority = NonNullable<CreateReceiptBody['priority']>;
@@ -49,7 +48,7 @@ export function CreateJinDrawer({ open, onClose }: { open: boolean; onClose: () 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF((p) => ({ ...p, [k]: v }));
 
   const errs = {
-    customer: !f.customer.trim() ? 'Enter the customer ID' : !isUuid(f.customer) ? 'Customer ID is a UUID' : null,
+    customer: !f.customer ? 'Choose the customer' : null,
     receivedAt: !f.receivedAt ? 'Enter when the equipment was received' : null,
     channel: !f.channel ? 'Choose how it arrived' : null,
     declared: f.declared.trim() && !/^\d+$/.test(f.declared.trim()) ? 'Whole number' : null,
@@ -62,7 +61,7 @@ export function CreateJinDrawer({ open, onClose }: { open: boolean; onClose: () 
     setTouched(true);
     if (Object.values(errs).some(Boolean)) return;
     const b: CreateReceiptBody = {
-      customer_id: f.customer.trim(),
+      customer_id: f.customer,
       receipt_at: new Date(f.receivedAt).toISOString(),
       receipt_channel: f.channel!,
       priority: f.priority,
@@ -99,17 +98,16 @@ export function CreateJinDrawer({ open, onClose }: { open: boolean; onClose: () 
         </>
       }
     >
-      <TextInput
+      <LookupPicker
         label="Customer *"
-        mono
         autoFocus
-        placeholder="Customer ID (UUID)"
-        value={f.customer}
-        onChange={(e) => set('customer', e.target.value)}
+        placeholder="Select customer"
+        value={f.customer || null}
+        onChange={(id) => set('customer', id ?? '')}
+        source={customerSource}
         error={show(errs.customer)}
-        helper="Paste the customer's ID from the customer master"
+        helper="Search by name or customer code"
       />
-      <GapNote code="G16">No customers lookup in the API — enter the customer ID. The JIN shows the ID until a lookup exists.</GapNote>
       <FieldRow>
         <DateField label="Received at *" withTime value={f.receivedAt} onChange={(e) => set('receivedAt', e.target.value)} error={show(errs.receivedAt)} />
         <NumberInput label="Declared quantity" inputMode="numeric" value={f.declared} onChange={(e) => set('declared', e.target.value)} error={show(errs.declared)} />

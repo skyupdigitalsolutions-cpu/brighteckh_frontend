@@ -2,60 +2,59 @@
 // Stage 177:116082: glass-strong card, radius 24, p-24, gap 14; head 18/24 SemiBold + job status + route badges;
 //   10-step stepper (28px dots radius 14; done = success fill + 14px white check; current = accent fill + 12/16
 //   number on-accent + 14/20 Medium label; pending = bg-subtle + muted 12/16 number + muted 12/16 label; 2px lines,
-//   success after a done step, default otherwise).
+//   success after a done step, default otherwise). `blocked` (API state, not drawn) = blocked-tone dot + label.
 // Columns 177:116137 (gap 20): Left flex (Unit 177:116139, History 177:116166) · Right 420 (Next step 177:116175,
 //   Assignment 177:116180, Time 177:116191). Cards: glass-strong, radius 24, p-24, gap 16, heading 18/24 SemiBold.
 //   Key/value: 12/16 secondary label, gap 3, value 14/20 Medium (or Data/ID 13/18 mono); grid gap 40.
 //   Timeline item 7:440: 12px tone dot with 3px tone-bg ring, 2px default connector, body pb-20, 14/20 Medium title,
-//   12/16 secondary meta.
+//   12/16 secondary meta "Actor · 04 Nov, 10:42".
 //   Next step: literal brand gradient, 11/14 SemiBold "NEXT STEP", 18/24 title, 14/20 secondary detail, primary button.
 //
-// Sources: job + current assignment = GET /jobs/{id} (useJobWorkspace); receipt/unit = GET /inward-receipts/{id}
-// (useJobWorkspace); report = GET /jobs/{id}/inspection-report; time = GET /jobs/{id}/inspection-sessions.
-// Gaps: G16 customer name, G17 engineer / actor names, G-C1-1 stages 5–10 (no job progress endpoint).
+// Sources: job + current assignment = GET /jobs/{id}; receipt/unit + customer/assembly/engineer names =
+// useJobWorkspace (lookups); stepper + assignment history = GET /jobs/{id}/progress (10 derived stages, every
+// assignment with engineer + assigned-by names); report = GET /jobs/{id}/inspection-report; time =
+// GET /jobs/{id}/inspection-sessions; other actor names (verifier, reviewers) = GET /lookups/employees?ids=.
+// Stepper labels are the API's stage labels (Figma draws Repair / Test / Dispatch; the API has PO & GRN /
+// Repair & test / Dispatch & invoice). A stage's status, `at`, `detail` and `rule` are its native tooltip.
 import { useState, type ReactNode } from 'react';
 import { IconCheck, IconClipboardList, IconInbox, IconUser } from '@tabler/icons-react';
 import { useMe } from '../../../auth/AuthProvider';
 import { can } from '../../../auth/access';
 import { useJobWorkspace } from '../job/JobWorkspace';
-import type { Job } from '../api';
+import { useEmployeesByIds, useJobProgress, type Job, type JobAssignmentHistoryRow, type JobProgressStage } from '../api';
 import { StatusPill } from '../../../ui/desktop/Badge';
 import { Button, ButtonLink } from '../../../ui/desktop/Button';
 import { ErrorState, errorBody } from '../../../ui/desktop/States';
 import { GapNote } from '../../../ui/desktop/Feedback';
+import { Avatar } from '../../../ui/desktop/Avatar';
 import { Ic, cx } from '../../../ui/desktop/Icon';
 import { enumLabel, formatDayTime, formatDuration } from '../../../lib/format';
 import {
-  formatWaiting, isOpen, shortId, useJobInspectionReport, useJobInspectionSessions, type InspectionReport,
+  formatWaiting, isOpen, useJobInspectionReport, useJobInspectionSessions, type InspectionReport, type InspectionSessions,
 } from './jobsData';
 import { ReassignDrawer } from './ReassignDrawer';
 
-type StepState = 'done' | 'current' | 'pending';
-const STEPS = ['Assigned', 'Custody', 'Inspection', 'Report review', 'Material', 'Quote', 'Authorised', 'Repair', 'Test', 'Dispatch'] as const;
+type StepState = JobProgressStage['status'];
 
 const card = 'glass-strong flex w-full flex-col items-start gap-[16px] overflow-clip rounded-[24px] p-[24px]';
 const h2 = 'min-w-0 flex-1 text-[18px] font-semibold leading-[24px] text-fg';
 
 export function JobOverviewTab() {
-  const { job, receipt, unit } = useJobWorkspace();
+  const ws = useJobWorkspace();
+  const { job, receipt, unit, engineerName } = ws;
   const me = useMe();
   const reportQ = useJobInspectionReport(job.id);
   const sessionsQ = useJobInspectionSessions(job.id);
+  const progressQ = useJobProgress(job.id);
   const [drawer, setDrawer] = useState(false);
 
   const report = reportQ.data ?? null;
   const a = job.current_assignment;
   const canAssign = can.purchaseWork(me.role) && isOpen(job.status);
-
-  // ---- stepper (steps 1–4 from data; 5–10 have no source here → G-C1-1)
-  const done = [
-    !!a && a.response !== 'DECLINED',
-    a?.response === 'ACCEPTED',
-    !!report && report.versions.length > 0,
-    report?.status === 'ACCEPTED',
-  ];
-  const firstOpen = done.findIndex((d) => !d);
-  const states: StepState[] = STEPS.map((_, i) => (i < 4 ? (done[i] ? 'done' : i === firstOpen ? 'current' : 'pending') : 'pending'));
+  const stages = progressQ.data?.stages;
+  // A pending stage before a done one = no record for it (e.g. no supplier PO because stock covered it).
+  const lastDone = stages ? stages.map((x) => x.status).lastIndexOf('done') : -1;
+  const gapStages = stages ? stages.filter((x, i) => i < lastDone && x.status === 'pending') : [];
 
   return (
     <>
@@ -66,11 +65,18 @@ export function JobOverviewTab() {
           <StatusPill domain="job" value={job.status} />
           <StatusPill domain="route" value={job.route} />
         </div>
-        <Stepper states={states} loading={reportQ.isPending} />
-        {firstOpen === -1 && (
+        {progressQ.isError && !stages ? (
+          <div className="flex w-full justify-center py-[4px]">
+            <ErrorState title="Couldn't load the job's progress" body={errorBody(progressQ.error)} onRetry={() => progressQ.refetch()} retrying={progressQ.isFetching} />
+          </div>
+        ) : (
+          <Stepper stages={stages} />
+        )}
+        {gapStages.length > 0 && (
           <GapNote code="G-C1-1">
-            Stages 5–10 (Material → Dispatch) aren't tracked on this overview: GET /jobs/{'{id}'} only carries the BR-02/03
-            status and there is no job-progress endpoint. Use the Material, Quote, Authorisation and Repair &amp; test tabs.
+            {gapStages.map((x) => x.label).join(', ')} {gapStages.length === 1 ? 'shows' : 'show'} pending although a later
+            stage is done: job progress has no &ldquo;skipped&rdquo; stage state, so a stage with no record (e.g. no supplier
+            PO because stock covered the material) can&apos;t be told apart from one not reached yet.
           </GapNote>
         )}
       </section>
@@ -78,51 +84,91 @@ export function JobOverviewTab() {
       {/* Columns 177:116137 */}
       <div className="flex w-full items-stretch gap-[20px]">
         <div className="flex min-w-px flex-1 flex-col items-start gap-[20px]">
-          <UnitCard job={job} receipt={receipt} unit={unit} />
-          <HistoryCard job={job} report={report} reportQ={reportQ} sessionsQ={sessionsQ} />
+          <UnitCard ws={ws} />
+          <HistoryCard
+            job={job}
+            verifiedById={unit?.verified_by_id ?? null}
+            engineerName={engineerName}
+            report={report}
+            reportQ={reportQ}
+            sessionsQ={sessionsQ}
+            assignments={progressQ.data?.assignments}
+            stages={stages}
+            loading={reportQ.isPending || sessionsQ.isPending || progressQ.isPending || !receipt}
+          />
         </div>
         <div className="flex w-[420px] shrink-0 flex-col items-start gap-[20px]">
           <NextStepCard job={job} report={report} loading={reportQ.isPending} canAssign={canAssign} onAssign={() => setDrawer(true)} />
-          <AssignmentCard job={job} canAssign={canAssign} onAssign={() => setDrawer(true)} />
+          <AssignmentCard job={job} engineerName={engineerName} canAssign={canAssign} onAssign={() => setDrawer(true)} />
           <TimeCard sessionsQ={sessionsQ} />
         </div>
       </div>
 
       {canAssign && (
-        <ReassignDrawer open={drawer} onClose={() => setDrawer(false)} jobId={job.id} jobNumber={job.job_number} current={a} />
+        <ReassignDrawer
+          open={drawer}
+          onClose={() => setDrawer(false)}
+          jobId={job.id}
+          jobNumber={job.job_number}
+          current={a}
+          currentName={engineerName}
+        />
       )}
     </>
   );
 }
 
 // ------------------------------------------------------------------ stepper
-function Stepper({ states, loading }: { states: StepState[]; loading: boolean }) {
+function stepTitle(st: JobProgressStage) {
+  return [`${st.label}: ${st.status}`, st.at && formatDayTime(st.at), st.detail, st.rule].filter(Boolean).join('\n');
+}
+
+function Stepper({ stages }: { stages: JobProgressStage[] | undefined }) {
+  if (!stages) {
+    return (
+      <div className="flex w-full items-center overflow-clip" role="status" aria-busy aria-label="Loading progress">
+        {Array.from({ length: 10 }, (_, i) => (
+          <div key={i} className="contents">
+            {i > 0 && <div className="h-[2px] min-w-px flex-1 bg-line" aria-hidden />}
+            <div className="flex shrink-0 flex-col items-center gap-[8px] overflow-clip">
+              <div className="h-[28px] w-[28px] shrink-0 animate-pulse rounded-[14px] bg-subtle" />
+              <span className="my-[2px] block h-[12px] w-[48px] animate-pulse rounded-[6px] bg-disabled" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
   return (
-    <div className="flex w-full items-center overflow-clip" aria-busy={loading || undefined}>
-      {STEPS.map((label, i) => {
-        const s = states[i]!;
+    <ol className="flex w-full items-center overflow-clip">
+      {stages.map((st, i) => {
+        const s: StepState = st.status;
+        const active = s === 'current' || s === 'blocked';
         return (
-          <div key={label} className="contents">
-            {i > 0 && <div className={cx('h-[2px] min-w-px flex-1', states[i - 1] === 'done' ? 'bg-success' : 'bg-line')} aria-hidden />}
-            <div className="flex shrink-0 flex-col items-center gap-[8px] overflow-clip" aria-current={s === 'current' ? 'step' : undefined}>
+          <li key={st.key} className="contents">
+            {i > 0 && <div className={cx('h-[2px] min-w-px flex-1', stages[i - 1]!.status === 'done' ? 'bg-success' : 'bg-line')} aria-hidden />}
+            <div className="flex shrink-0 flex-col items-center gap-[8px] overflow-clip" aria-current={active ? 'step' : undefined} title={stepTitle(st)}>
               <div className={cx(
                 'flex h-[28px] w-[28px] shrink-0 items-center justify-center overflow-clip rounded-[14px]',
-                s === 'done' ? 'bg-success text-fg-on-accent' : s === 'current' ? 'bg-accent' : 'bg-subtle',
+                s === 'done' ? 'bg-success text-fg-on-accent' : s === 'current' ? 'bg-accent' : s === 'blocked' ? 'bg-st-blocked-fg' : 'bg-subtle',
               )}>
                 {s === 'done'
                   ? <Ic icon={IconCheck} size={14} />
-                  : <span className={cx('whitespace-nowrap text-[12px] leading-[16px]', s === 'current' ? 'text-fg-on-accent' : 'text-fg-muted')}>{i + 1}</span>}
+                  : <span className={cx('whitespace-nowrap text-[12px] leading-[16px]', active ? 'text-fg-on-accent' : 'text-fg-muted')}>{i + 1}</span>}
               </div>
               <span className={cx(
                 'whitespace-nowrap',
                 s === 'current' ? 'text-[14px] font-medium leading-[20px] text-fg'
-                  : s === 'done' ? 'text-[12px] leading-[16px] text-fg' : 'text-[12px] leading-[16px] text-fg-muted',
-              )}>{label}</span>
+                  : s === 'blocked' ? 'text-[14px] font-medium leading-[20px] text-st-blocked-fg'
+                    : s === 'done' ? 'text-[12px] leading-[16px] text-fg' : 'text-[12px] leading-[16px] text-fg-muted',
+              )}>
+                {st.label}{s === 'blocked' && <span className="sr-only"> (blocked)</span>}
+              </span>
             </div>
-          </div>
+          </li>
         );
       })}
-    </div>
+    </ol>
   );
 }
 
@@ -139,9 +185,9 @@ const Skel = ({ w }: { w: number }) => <span className="my-[4px] block h-[12px] 
 
 type WS = ReturnType<typeof useJobWorkspace>;
 
-function UnitCard({ job, receipt, unit }: { job: Job; receipt: WS['receipt']; unit: WS['unit'] }) {
+function UnitCard({ ws }: { ws: WS }) {
+  const { job, receipt, unit, unitsInGroup, customer, customerLoading } = ws;
   const loading = !receipt;
-  const ofGroup = receipt && unit ? receipt.equipment_units.filter((u) => u.group_id === unit.group_id).length : 0;
   const v = (x: string | null | undefined) => (loading ? <Skel w={110} /> : x?.trim() || '—');
   return (
     <section className={card}>
@@ -150,9 +196,8 @@ function UnitCard({ job, receipt, unit }: { job: Job; receipt: WS['receipt']; un
         <ButtonLink to={`/p/inward/${job.inward_id}`} kind="secondary" icon={<Ic icon={IconInbox} size={18} />}>View inward receipt</ButtonLink>
       </div>
       <div className="flex w-full items-start gap-[40px] overflow-clip">
-        {/* G16: no customer name in the API (receipt carries customer_id only). */}
-        <KV label="Customer">—</KV>
-        <KV label="Inward" mono>{loading ? <Skel w={150} /> : unit ? `${receipt!.jin_number} · unit ${unit.unit_number} of ${ofGroup}` : receipt!.jin_number}</KV>
+        <KV label="Customer">{loading || customerLoading ? <Skel w={140} /> : customer?.customer_name ?? '—'}</KV>
+        <KV label="Inward" mono>{loading ? <Skel w={150} /> : unit ? `${receipt.jin_number} · unit ${unit.unit_number} of ${unitsInGroup}` : receipt.jin_number}</KV>
         <KV label="Serial no." mono>{v(unit?.serial_number)}</KV>
         <KV label="Make / model">{loading ? <Skel w={110} /> : [unit?.observed_make, unit?.observed_model].filter(Boolean).join(' · ') || '—'}</KV>
       </div>
@@ -161,47 +206,90 @@ function UnitCard({ job, receipt, unit }: { job: Job; receipt: WS['receipt']; un
         <KV label="Condition">{v(unit?.physical_condition)}</KV>
         <KV label="Accessories">{v(unit?.accessories)}</KV>
       </div>
-      <GapNote code="G16">Customer name isn't readable: the receipt only carries customer_id and there is no customers lookup.</GapNote>
     </section>
   );
 }
 
 type Tone = 'neutral' | 'progress' | 'success';
-type Event = { at: string; title: string; detail?: string | null; tone: Tone };
+type Event = { at: string; title: string; actor?: string | null; detail?: string | null; tone: Tone };
 const DOT: Record<Tone, string> = {
   neutral: 'bg-st-neutral-fg shadow-[0_0_0_3px_var(--color-status-neutral-bg)]',
   progress: 'bg-st-progress-fg shadow-[0_0_0_3px_var(--color-status-progress-bg)]',
   success: 'bg-st-success-fg shadow-[0_0_0_3px_var(--color-status-success-bg)]',
 };
 
-function HistoryCard({ job, report, reportQ, sessionsQ }: {
+/** Stages the history adds from GET /jobs/{id}/progress (the earlier ones come from their own records). */
+const LATER_STAGES = new Set<JobProgressStage['key']>(['MATERIAL', 'QUOTE', 'AUTHORISATION', 'PO_GRN', 'REPAIR_TEST', 'DISPATCH_INVOICE']);
+
+type AssignmentEvt = Pick<JobAssignmentHistoryRow,
+  'engineer_id' | 'assigned_by_id' | 'assigned_at' | 'response' | 'responded_at' | 'response_reason' | 'reassignment_reason'>;
+
+function HistoryCard({ job, verifiedById, engineerName, report, reportQ, sessionsQ, assignments, stages, loading }: {
   job: Job;
+  verifiedById: string | null;
+  engineerName: string | null;
   report: InspectionReport | null;
   reportQ: ReturnType<typeof useJobInspectionReport>;
   sessionsQ: ReturnType<typeof useJobInspectionSessions>;
+  /** Every assignment, oldest first (progress); undefined while loading or if progress failed. */
+  assignments: JobAssignmentHistoryRow[] | undefined;
+  stages: JobProgressStage[] | undefined;
+  loading: boolean;
 }) {
-  const a = job.current_assignment;
-  const ev: Event[] = [{ at: job.created_at, title: 'Unit verified · job created', tone: 'success' }];
-  if (a) {
-    ev.push({ at: a.assigned_at, title: a.reassignment_reason ? 'Engineer reassigned' : 'Engineer assigned', detail: a.reassignment_reason, tone: 'neutral' });
-    if (a.responded_at && a.response === 'ACCEPTED') ev.push({ at: a.responded_at, title: 'Custody acknowledged', tone: 'success' });
-    if (a.responded_at && a.response === 'DECLINED') ev.push({ at: a.responded_at, title: 'Custody declined', detail: a.response_reason, tone: 'neutral' });
+  const sessions: InspectionSessions['sessions'] = sessionsQ.data?.sessions ?? [];
+  // Names: engineers + assigners from progress; anyone else (verifier, reviewers, an engineer not in that history)
+  // from the employees lookup.
+  const names: Record<string, string> = {};
+  for (const x of assignments ?? []) { names[x.engineer_id] = x.engineer_name; names[x.assigned_by_id] = x.assigned_by_name; }
+  if (job.current_assignment && engineerName) names[job.current_assignment.engineer_id] ??= engineerName;
+  const wanted = [
+    verifiedById,
+    ...(report?.reviews.map((r) => r.reviewer_id) ?? []),
+    ...(report?.versions.map((v) => v.engineer_id) ?? []),
+    ...sessions.map((x) => x.engineer_id),
+    ...(assignments ? [] : job.current_assignment ? [job.current_assignment.assigned_by_id] : []),
+  ].filter((x): x is string => !!x && !names[x]);
+  const empQ = useEmployeesByIds(wanted);
+  const nameOf = (id: string | null | undefined) => (id ? names[id] ?? empQ.data?.[id]?.full_name ?? null : null);
+
+  const ev: Event[] = [{ at: job.created_at, title: 'Unit verified · job created', actor: nameOf(verifiedById), tone: 'success' }];
+  const rows: AssignmentEvt[] = assignments ?? (job.current_assignment ? [job.current_assignment] : []);
+  for (const x of rows) {
+    const eng = nameOf(x.engineer_id);
+    ev.push({
+      at: x.assigned_at,
+      title: `${x.reassignment_reason ? 'Reassigned' : 'Assigned'} to ${eng ?? 'an engineer'}`,
+      actor: nameOf(x.assigned_by_id),
+      detail: x.reassignment_reason,
+      tone: 'neutral',
+    });
+    if (x.responded_at && x.response === 'ACCEPTED') ev.push({ at: x.responded_at, title: 'Custody acknowledged', actor: eng, tone: 'success' });
+    if (x.responded_at && x.response === 'DECLINED') ev.push({ at: x.responded_at, title: 'Custody declined', actor: eng, detail: x.response_reason, tone: 'neutral' });
   }
-  const firstSession = sessionsQ.data?.sessions[0];
-  if (firstSession) ev.push({ at: firstSession.started_at, title: 'Inspection started', tone: 'neutral' });
+  const firstSession = sessions[0];
+  if (firstSession) ev.push({ at: firstSession.started_at, title: 'Inspection started', actor: nameOf(firstSession.engineer_id), tone: 'neutral' });
   if (report) {
     for (const v of report.versions) {
-      if (v.submitted_at) ev.push({ at: v.submitted_at, title: `Inspection report v${v.version_no} submitted`, detail: v.outcome ? `Outcome ${enumLabel(v.outcome)}` : null, tone: 'progress' });
+      if (v.submitted_at) {
+        ev.push({
+          at: v.submitted_at, title: `Inspection report v${v.version_no} submitted`, actor: nameOf(v.engineer_id),
+          detail: v.outcome ? `Outcome ${enumLabel(v.outcome)}` : null, tone: 'progress',
+        });
+      }
     }
     for (const r of report.reviews) {
       const vno = report.versions.find((v) => v.id === r.version_id)?.version_no;
       ev.push({
         at: r.reviewed_at,
         title: `Inspection report${vno ? ` v${vno}` : ''} ${r.review_decision === 'ACCEPT' ? 'accepted' : 'returned'}`,
+        actor: nameOf(r.reviewer_id),
         detail: r.review_comment,
         tone: r.review_decision === 'ACCEPT' ? 'success' : 'neutral',
       });
     }
+  }
+  for (const st of stages ?? []) {
+    if (LATER_STAGES.has(st.key) && st.status === 'done' && st.at) ev.push({ at: st.at, title: `${st.label} done`, detail: st.detail, tone: 'success' });
   }
   if (job.closed_at) ev.push({ at: job.closed_at, title: 'Job closed', tone: 'success' });
   if (job.cancelled_at) ev.push({ at: job.cancelled_at, title: 'Job cancelled', detail: job.cancel_reason, tone: 'neutral' });
@@ -225,15 +313,14 @@ function HistoryCard({ job, report, reportQ, sessionsQ }: {
               </div>
               <div className="flex min-w-px flex-1 flex-col items-start gap-[2px] overflow-clip pb-[20px]">
                 <p className="text-[14px] font-medium leading-[20px] text-fg">{e.title}</p>
-                <p className="whitespace-nowrap text-[12px] leading-[16px] text-fg-2">{formatDayTime(e.at)}</p>
+                <p className="whitespace-nowrap text-[12px] leading-[16px] text-fg-2">{[e.actor, formatDayTime(e.at)].filter(Boolean).join(' · ')}</p>
                 {e.detail && <p className="text-[14px] leading-[20px] text-fg-2">{e.detail}</p>}
               </div>
             </li>
           ))}
-          {(reportQ.isPending || sessionsQ.isPending) && <li className="flex w-full flex-col gap-[8px] pl-[24px]"><Skel w={220} /><Skel w={120} /></li>}
+          {loading && <li className="flex w-full flex-col gap-[8px] pl-[24px]"><Skel w={220} /><Skel w={120} /></li>}
         </ol>
       )}
-      <GapNote code="G17">Actor names aren't shown — the API returns employee ids only, with no employee lookup. Only the current assignment is readable (earlier assignments aren't listed).</GapNote>
     </section>
   );
 }
@@ -283,7 +370,9 @@ function NextStepCard({ job, report, loading, canAssign, onAssign }: {
   );
 }
 
-function AssignmentCard({ job, canAssign, onAssign }: { job: Job; canAssign: boolean; onAssign: () => void }) {
+function AssignmentCard({ job, engineerName, canAssign, onAssign }: {
+  job: Job; engineerName: string | null; canAssign: boolean; onAssign: () => void;
+}) {
   const a = job.current_assignment;
   return (
     <section className={cx(card, 'shrink-0')}>
@@ -292,13 +381,17 @@ function AssignmentCard({ job, canAssign, onAssign }: { job: Job; canAssign: boo
         {a && <StatusPill domain="assignment" value={a.response} />}
       </div>
       <div className="flex w-full items-center gap-[12px] overflow-clip">
-        <span className="flex h-[44px] w-[44px] shrink-0 items-center justify-center overflow-clip rounded-[22px] bg-subtle text-fg-2" aria-hidden>
-          <Ic icon={IconUser} size={20} />
-        </span>
+        {a && engineerName ? (
+          <Avatar name={engineerName} seed={a.engineer_id} size={44} className="!text-fg" />
+        ) : (
+          <span className="flex h-[44px] w-[44px] shrink-0 items-center justify-center overflow-clip rounded-[22px] bg-subtle text-fg-2" aria-hidden>
+            <Ic icon={IconUser} size={20} />
+          </span>
+        )}
         <div className="flex min-w-px flex-1 flex-col items-start gap-[2px] overflow-clip whitespace-nowrap">
           {a ? (
             <>
-              <p className="font-mono text-[13px] font-medium leading-[20px] text-fg" title={a.engineer_id}>Engineer {shortId(a.engineer_id)}</p>
+              <p className="text-[14px] font-medium leading-[20px] text-fg">{engineerName ?? <Skel w={90} />}</p>
               <p className="text-[12px] leading-[16px] text-fg-2">
                 {a.response === 'ACCEPTED' && a.responded_at
                   ? `Service engineer · custody since ${formatDayTime(a.responded_at)}`

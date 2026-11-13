@@ -9,39 +9,66 @@
 // assignEngineer): CANCELLED/CLOSED jobs are rejected; engineer must be an active ENGINEER of the company;
 // reassignment_reason is required when the job already has a current assignment; the new assignment starts PENDING
 // (engineer acknowledges custody) and the job moves to ASSIGNED. Any rejection is shown verbatim (FormErrors).
-// G17: no engineer lookup → the picker slot takes the engineer's employee UUID; no names, no "n open jobs".
-import { useEffect, useId, useState, type FormEvent } from 'react';
+// Picker = kit LookupRadioList over engineerSource (GET /lookups/engineers: active engineers + open-job counts), with
+// the current engineer removed from the list (Figma shows them only in the CURRENT card). Deviation: the kit cards
+// carry a radio dot that the Figma cards don't draw.
+import { useEffect, useId, useMemo, useState, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { IconCheck, IconUser, IconX } from '@tabler/icons-react';
-import { useAssignEngineer, type JobAssignment } from '../api';
+import { IconCheck, IconX } from '@tabler/icons-react';
+import { engineerSource, useAssignEngineer, useEngineersByIds, type EngineerLookupRow, type JobAssignment } from '../api';
 import { Ic, cx } from '../../../ui/desktop/Icon';
 import { Badge } from '../../../ui/desktop/Badge';
 import { Button } from '../../../ui/desktop/Button';
 import { TextInput } from '../../../ui/desktop/Fields';
-import { FormErrors, GapNote } from '../../../ui/desktop/Feedback';
+import { FormErrors } from '../../../ui/desktop/Feedback';
 import { Scrim, useDismiss } from '../../../ui/desktop/Popover';
 import { useToast } from '../../../ui/desktop/Toast';
+import { Avatar } from '../../../ui/desktop/Avatar';
+import { LookupRadioList, type LookupSource } from '../../../ui/desktop/LookupPicker';
 import { enumLabel, formatDayTime } from '../../../lib/format';
-import { isUuid, shortId } from './jobsData';
 
-export function ReassignDrawer({ open, onClose, jobId, jobNumber, current }: {
+/** What the drawer needs of the current assignment (from GET /jobs/{id} or a GET /jobs list row). */
+export type CurrentAssignment = Pick<JobAssignment, 'engineer_id' | 'response' | 'assigned_at'>;
+
+/** engineerSource minus one engineer (the current one). */
+function useSourceWithout(excludeId: string | undefined): LookupSource<EngineerLookupRow> {
+  return useMemo(() => (!excludeId ? engineerSource : {
+    ...engineerSource,
+    useSearch: (search: string, enabled: boolean) => {
+      const q = engineerSource.useSearch(search, enabled);
+      const d = q.data;
+      if (!d) return q;
+      const rows = d.rows.filter((r) => r.id !== excludeId);
+      return { ...q, data: { ...d, rows, total: d.total - (d.rows.length - rows.length) } };
+    },
+  }), [excludeId]);
+}
+
+export function ReassignDrawer({ open, onClose, jobId, jobNumber, current, currentName }: {
   open: boolean;
   onClose: () => void;
   jobId: string;
   jobNumber: string;
   /** The job's current assignment (null = first assignment). */
-  current: JobAssignment | null;
+  current: CurrentAssignment | null;
+  /** Current engineer's name when the caller already has it (list row / progress) — used if the lookup misses. */
+  currentName?: string | null;
 }) {
   const assign = useAssignEngineer(jobId);
   const toast = useToast();
   const [engineerId, setEngineerId] = useState('');
+  const [picked, setPicked] = useState<EngineerLookupRow | null>(null);
+  const source = useSourceWithout(current?.engineer_id);
+  const currentQ = useEngineersByIds(open && current ? [current.engineer_id] : []);
+  const curRow = current ? currentQ.data?.[current.engineer_id] : undefined;
+  const curName = curRow?.full_name ?? currentName ?? null;
   const [reason, setReason] = useState('');
   const [tried, setTried] = useState(false);
   const titleId = useId();
   const reassigning = !!current;
 
   useEffect(() => {
-    if (open) { setEngineerId(''); setReason(''); setTried(false); assign.reset(); }
+    if (open) { setEngineerId(''); setPicked(null); setReason(''); setTried(false); assign.reset(); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -56,9 +83,8 @@ export function ReassignDrawer({ open, onClose, jobId, jobNumber, current }: {
   }, [open]);
   if (!open) return null;
 
-  const id = engineerId.trim();
-  const idError = !id ? 'Enter the engineer\'s employee ID.' : !isUuid(id) ? 'Must be a UUID (employee id).' : null;
-  const sameAsCurrent = !!current && id.toLowerCase() === current.engineer_id.toLowerCase();
+  const id = engineerId;
+  const idError = !id ? 'Choose an engineer.' : null;
   // Mirrors the server message; the server still enforces it.
   const reasonError = reassigning && !reason.trim() ? 'reassignment_reason is required when reassigning an already-assigned job' : null;
 
@@ -70,7 +96,8 @@ export function ReassignDrawer({ open, onClose, jobId, jobNumber, current }: {
       { engineer_id: id, ...(reassigning ? { reassignment_reason: reason.trim() } : {}) },
       {
         onSuccess: () => {
-          toast({ tone: 'success', title: reassigning ? 'Engineer reassigned' : 'Engineer assigned', body: `${jobNumber} · the engineer must acknowledge custody.` });
+          const who = picked?.full_name ?? 'The engineer';
+          toast({ tone: 'success', title: reassigning ? `Reassigned to ${who}` : `Assigned to ${who}`, body: `${jobNumber} · ${who} must acknowledge custody.` });
           onClose();
         },
       },
@@ -78,8 +105,10 @@ export function ReassignDrawer({ open, onClose, jobId, jobNumber, current }: {
   };
 
   const subtitle = current
-    ? `${jobNumber} · currently engineer ${shortId(current.engineer_id)}`
+    ? `${jobNumber} · currently ${curName ?? (currentQ.isPending ? '…' : 'an engineer not in the active list')}`
     : `${jobNumber} · no engineer assigned`;
+  const verb = reassigning ? 'Reassign' : 'Assign';
+  const submitLabel = picked ? `${verb} to ${picked.full_name}` : `${verb} engineer`;
 
   return createPortal(
     <>
@@ -115,40 +144,28 @@ export function ReassignDrawer({ open, onClose, jobId, jobNumber, current }: {
           {/* Current engineer card 177:116347 */}
           {current && (
             <div className="flex w-full shrink-0 items-center gap-[12px] overflow-clip rounded-[16px] border border-line bg-subtle px-[16px] py-[12px]">
-              <span className="flex h-[40px] w-[40px] shrink-0 items-center justify-center overflow-clip rounded-[20px] bg-disabled text-fg-2" aria-hidden>
-                <Ic icon={IconUser} size={20} />
-              </span>
+              {curName
+                ? <Avatar name={curName} seed={current.engineer_id} size={40} className="!text-fg" />
+                : <span className="h-[40px] w-[40px] shrink-0 rounded-full bg-disabled" aria-hidden />}
               <div className="flex min-w-0 flex-1 flex-col items-start gap-[2px] overflow-clip whitespace-nowrap">
-                <p className="font-mono text-[13px] font-medium leading-[20px] text-fg" title={current.engineer_id}>{current.engineer_id}</p>
+                <p className="text-[14px] font-medium leading-[20px] text-fg">{curName ?? (currentQ.isPending ? 'Loading…' : 'Engineer not in the active list')}</p>
                 <p className="text-[12px] leading-[16px] text-fg-2">
-                  {enumLabel(current.response)} · assigned {formatDayTime(current.assigned_at)}
+                  {curRow ? engineerSource.getSub!(curRow) : `${enumLabel(current.response)} · assigned ${formatDayTime(current.assigned_at)}`}
                 </p>
               </div>
               <Badge tone="neutral" label="CURRENT" />
             </div>
           )}
 
-          {/* Picker slot = selected card 177:116354, holding the engineer-id input (G17). */}
-          <div className="flex w-full shrink-0 items-start gap-[12px] overflow-clip rounded-[16px] border-2 border-brand-border bg-brand-subtle px-[16px] py-[12px]">
-            <span className="mt-[26px] flex h-[40px] w-[40px] shrink-0 items-center justify-center overflow-clip rounded-[20px] bg-surface text-fg-2" aria-hidden>
-              <Ic icon={IconUser} size={20} />
-            </span>
-            <TextInput
-              label={reassigning ? 'New engineer — employee ID' : 'Engineer — employee ID'}
-              mono
-              autoFocus
-              value={engineerId}
-              onChange={(e) => setEngineerId(e.target.value)}
-              placeholder="00000000-0000-0000-0000-000000000000"
-              error={tried ? idError : null}
-              helper={sameAsCurrent ? 'This is the current engineer.' : undefined}
-              className="min-w-0 flex-1"
-            />
-          </div>
-          <GapNote code="G17">
-            There is no engineer / employee lookup in the API, so engineers can't be listed by name or open-job count.
-            Paste the engineer's employee UUID; the server checks it is an active Service Engineer in this company.
-          </GapNote>
+          {/* Engineer cards 177:116354 / 116360 / 116366 */}
+          <LookupRadioList
+            value={engineerId || null}
+            onChange={(eid, row) => { setEngineerId(eid); setPicked(row); }}
+            source={source}
+            searchPlaceholder="Search engineers"
+            emptyText={current ? 'No other active engineers in this company.' : 'No active engineers in this company.'}
+            error={tried ? idError : null}
+          />
 
           {/* Reason 177:116372 (required only when replacing a current assignment — server rule). */}
           {reassigning && (
@@ -168,7 +185,7 @@ export function ReassignDrawer({ open, onClose, jobId, jobNumber, current }: {
         <div className={cx('flex w-full shrink-0 items-start gap-[12px] overflow-clip [&>*]:min-w-px [&>*]:flex-1')}>
           <Button kind="secondary" onClick={close}>Cancel</Button>
           <Button kind="primary" type="submit" busy={busy} icon={<Ic icon={IconCheck} size={18} />}>
-            {reassigning ? 'Reassign engineer' : 'Assign engineer'}
+            {submitLabel}
           </Button>
         </div>
       </form>

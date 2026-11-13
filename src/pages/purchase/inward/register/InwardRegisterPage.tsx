@@ -7,29 +7,38 @@
 // Status · Priority · date) → Table card (header row + rows, 8 per page) → Pagination. With one page the card
 // fills to the bottom (656 tall, as in the loading / search frames); with pagination it is 586.
 //
-// G14: no list endpoint → `useInwardRegister` resolves to an unavailable, empty result and the designed empty state
-// shows GapNote G14 + "Open a JIN" by receipt ID/link (closest real path: GET /inward-receipts/{id}).
-import { useMemo, useState, type ReactNode } from 'react';
+// Data: GET /inward-receipts (useInwardReceiptsList) — server pagination (page_size 8), status / priority / month
+// filters and search (JIN, customer, DC no.), newest receipt_at first. The tab's status set and the Status filter are
+// intersected before they are sent. The previous page stays on screen (dimmed) while the next one loads.
+import { useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IconCamera, IconEye, IconFilePlus, IconPackage, IconPlus } from '@tabler/icons-react';
 import { useAuth } from '../../../../auth/AuthProvider';
 import { can } from '../../../../auth/access';
-import { enumLabel, formatDayTime } from '../../../../lib/format';
+import { enumLabel, formatDayTime, formatMonthYear } from '../../../../lib/format';
+import { useDebouncedValue } from '../../../../lib/useDebouncedValue';
 import {
-  Button, EmptyState, ErrorState, FilterMenu, GapNote, Ic, PageContent, PageHeader, Pagination, PriorityChip,
+  Button, cx, EmptyState, ErrorState, FilterMenu, GapNote, Ic, PageContent, PageHeader, Pagination, PriorityChip,
   RowMenuTrigger, SearchField, SkeletonRows, StateCard, StatusPill, Tab, TabBar, TableCard, TD, TH, THead, TR,
-  ToolbarCard, ToolbarSpacer, UnitsProgress, errorBody, paginate, useToast, type RowMenuItem,
+  ToolbarCard, ToolbarSpacer, UnitsProgress, errorBody, useToast, type RowMenuItem,
 } from '../../../../ui/desktop';
+import { useInwardReceiptsList, type ReceiptListRow, type ReceiptsListParams } from '../../api';
 import { CreateJinDrawer } from '../detail/CreateJinDrawer';
-import { DateMenu } from './DateMenu';
-import { OpenJinField } from './OpenJinField';
-import {
-  applyFilters, useInwardRegister, type ReceiptPriority, type ReceiptStatus, type RegisterFilters, type RegisterRow,
-  type RegisterTab,
-} from './useInwardRegister';
 
 const PAGE_SIZE = 8; // rows per page in 177:102734
 
+type ReceiptStatus = ReceiptListRow['receipt_status'];
+type ReceiptPriority = ReceiptListRow['priority'];
+
+/** Tabs (177:102738, no counts drawn): All receipts · Awaiting verification (REGISTERED + VERIFYING, 177:105577) ·
+ *  On hold · Closed. */
+type RegisterTab = 'ALL' | 'AWAITING' | 'ON_HOLD' | 'CLOSED';
+const TAB_STATUSES: Record<RegisterTab, ReceiptStatus[] | null> = {
+  ALL: null,
+  AWAITING: ['REGISTERED', 'VERIFYING'],
+  ON_HOLD: ['ON_HOLD'],
+  CLOSED: ['CLOSED'],
+};
 const TABS: { value: RegisterTab; label: string }[] = [
   { value: 'ALL', label: 'All receipts' },
   { value: 'AWAITING', label: 'Awaiting verification' },
@@ -55,10 +64,36 @@ const PRIORITY_OPTIONS: { value: ReceiptPriority | 'ALL'; label: string }[] = [
   { value: 'CRITICAL', label: 'Critical' },
 ];
 
+// Date menu (trigger 177:102755, menu 177:106948) = kit FilterMenu kind="date" align="end" (200 wide): current month
+// (default, unapplied look) and the two previous months, sent as `month=YYYY-MM` (the API matches receipt_at in the
+// company timezone). Figma's "Last 7 days" can't be sent (the API filters by month only) — replaced by "All months".
+type DateKey = 'm0' | 'm1' | 'm2' | 'all';
+const ymFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit' });
+const monthAgo = (back: number, now = new Date()) => new Date(now.getFullYear(), now.getMonth() - back, 15);
+const yearMonth = (d: Date) => ymFmt.format(d).slice(0, 7); // "2026-11"
+function dateOptions(now = new Date()): { value: DateKey; label: string }[] {
+  return [
+    { value: 'm0', label: formatMonthYear(monthAgo(0, now)) },
+    { value: 'm1', label: formatMonthYear(monthAgo(1, now)) },
+    { value: 'm2', label: formatMonthYear(monthAgo(2, now)) },
+    { value: 'all', label: 'All months' },
+  ];
+}
+const monthParam = (k: DateKey) => (k === 'all' ? undefined : yearMonth(monthAgo(k === 'm0' ? 0 : k === 'm1' ? 1 : 2)));
+
+type Filters = { tab: RegisterTab; status: ReceiptStatus | 'ALL'; priority: ReceiptPriority | 'ALL'; date: DateKey; search: string };
+const DEFAULT_FILTERS: Filters = { tab: 'ALL', status: 'ALL', priority: 'ALL', date: 'm0', search: '' };
+
+/** Tab set ∩ Status filter. null = no status filter; [] = nothing can match (no request is sent). */
+function effectiveStatuses(f: Filters): ReceiptStatus[] | null {
+  const tabSet = TAB_STATUSES[f.tab];
+  if (f.status === 'ALL') return tabSet;
+  if (!tabSet) return [f.status];
+  return tabSet.includes(f.status) ? [f.status] : [];
+}
+
 // Column widths from the header row 177:102759 (Customer grows: 508 at 1384).
 const W = { jin: 130, received: 150, channel: 100, units: 170, priority: 100, status: 120, menu: 40 };
-
-const DEFAULT_FILTERS: RegisterFilters = { tab: 'ALL', status: 'ALL', priority: 'ALL', date: 'm0', search: '' };
 
 function HeaderRow() {
   return (
@@ -75,21 +110,25 @@ function HeaderRow() {
   );
 }
 
-function RegisterRowView({ r, menu }: { r: RegisterRow; menu: RowMenuItem[] }) {
+function RegisterRowView({ r, menu }: { r: ReceiptListRow; menu: RowMenuItem[] }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  // Units verified = verified unit rows / units received (Σ group quantity; expanded rows if ever more), so a JIN
+  // whose groups are not expanded yet reads 0 / n rather than 0 / 0.
+  const total = Math.max(r.units_received, r.units_total);
   return (
-    <TR to={`/p/inward/${r.id}`}>
+    <TR to={`/p/inward/${r.id}`} selected={menuOpen}>
       <TD w={W.jin} kind="id">{r.jin_number}</TD>
       <TD w={W.received} kind="text">{formatDayTime(r.receipt_at)}</TD>
-      <TD grow kind="strong">{r.customer_name ?? '—'}</TD>
+      <TD grow kind="strong"><span title={r.customer_code}>{r.customer_name}</span></TD>
       <TD w={W.channel} kind="small">{enumLabel(r.receipt_channel)}</TD>
       <TD w={W.units}>
-        {r.units_total != null && r.units_verified != null
-          ? <UnitsProgress done={r.units_verified} total={r.units_total} />
-          : <span className="text-[14px] leading-[20px] text-fg-2">—</span>}
+        {total > 0
+          ? <UnitsProgress done={r.units_verified} total={total} />
+          : <span className="text-[14px] leading-[20px] text-fg-2">No units yet</span>}
       </TD>
       <TD w={W.priority}><PriorityChip priority={r.priority} /></TD>
       <TD w={W.status}><StatusPill domain="receipt" value={r.receipt_status} /></TD>
-      <TD w={W.menu}><RowMenuTrigger items={menu} label={`Actions for ${r.jin_number}`} /></TD>
+      <TD w={W.menu}><RowMenuTrigger items={menu} label={`Actions for ${r.jin_number}`} onOpenChange={setMenuOpen} /></TD>
     </TR>
   );
 }
@@ -99,23 +138,34 @@ export function InwardRegisterPage() {
   const navigate = useNavigate();
   const toast = useToast();
   const isPurchase = !!me && can.purchaseWork(me.role);
-  const q = useInwardRegister();
 
-  const [filters, setFilters] = useState<RegisterFilters>(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
-  const update = (patch: Partial<RegisterFilters>) => { setFilters((f) => ({ ...f, ...patch })); setPage(1); };
+  const update = (patch: Partial<Filters>) => { setFilters((f) => ({ ...f, ...patch })); setPage(1); };
+  const search = useDebouncedValue(filters.search.trim());
 
-  const filtered = useMemo(() => (q.data ? applyFilters(q.data.rows, filters) : []), [q.data, filters]);
-  const paged = paginate(filtered, page, PAGE_SIZE);
+  const statuses = effectiveStatuses(filters);
+  const impossible = statuses !== null && statuses.length === 0;
+  const month = monthParam(filters.date);
+  const params: ReceiptsListParams = {
+    page,
+    page_size: PAGE_SIZE,
+    ...(statuses ? { status: statuses } : {}),
+    ...(filters.priority !== 'ALL' ? { priority: filters.priority } : {}),
+    ...(month ? { month } : {}),
+    ...(search ? { search } : {}),
+  };
+  const q = useInwardReceiptsList(params, !impossible);
+
   const filtersActive = filters.tab !== 'ALL' || filters.status !== 'ALL' || filters.priority !== 'ALL'
     || filters.date !== DEFAULT_FILTERS.date || filters.search.trim() !== '';
-
-  const openCreate = () => setCreateOpen(true);
+  // receipt_status is never advanced by any API — a status set without REGISTERED can only come back empty.
+  const statusNeverSet = statuses !== null && !statuses.includes('REGISTERED');
 
   // Row menu (177:108933). Every item is something PURCHASE can do; the write actions open the JIN detail
   // (the drawers live there) with `?action=` so it can open the right drawer.
-  const menuFor = (r: RegisterRow): RowMenuItem[] => [
+  const menuFor = (r: ReceiptListRow): RowMenuItem[] => [
     { label: 'Open receipt', icon: IconEye, onSelect: () => navigate(`/p/inward/${r.id}`) },
     ...(isPurchase ? [
       { label: 'Add equipment group', icon: IconPlus, onSelect: () => navigate(`/p/inward/${r.id}?action=add-group`) },
@@ -132,18 +182,22 @@ export function InwardRegisterPage() {
   ];
 
   const createButton = isPurchase
-    ? <Button icon={<Ic icon={IconPlus} size={18} />} onClick={openCreate}>Create JIN</Button>
+    ? <Button icon={<Ic icon={IconPlus} size={18} />} onClick={() => setCreateOpen(true)}>Create JIN</Button>
     : null;
 
+  const rows = q.data?.rows ?? [];
+  const total = q.data?.total ?? 0;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
   let body: ReactNode;
-  if (q.isPending) {
+  if (!impossible && q.isPending) {
     body = (
       <TableCard className="min-h-[656px] flex-1">
         <HeaderRow />
         <SkeletonRows rows={8} />
       </TableCard>
     );
-  } else if (q.isError) {
+  } else if (!impossible && q.isError && !q.data) {
     body = (
       <StateCard>
         <ErrorState
@@ -154,44 +208,32 @@ export function InwardRegisterPage() {
         />
       </StateCard>
     );
-  } else if (filtered.length === 0) {
-    const unavailable = !q.data.available;
+  } else if (impossible || rows.length === 0) {
     body = (
       <StateCard>
         <EmptyState
           icon={IconPackage}
-          title={unavailable
-            ? "The register can't list receipts yet"
-            : filtersActive ? 'No receipts match these filters' : 'No inward receipts this month'}
-          body={unavailable || !filtersActive
-            ? 'Create a JIN when equipment arrives — walk-in or courier. Each unit gets its own Job ID after verification.'
-            : 'Clear the search or change the tab and filters.'}
-          action={(
-            <div className="flex w-full flex-col items-center gap-[12px]">
-              {(unavailable || !filtersActive) && createButton}
-              {unavailable && (
-                <>
-                  <OpenJinField className="w-full" />
-                  <GapNote code="G14" className="text-left">
-                    There is no inward-receipt list endpoint, so receipts can't be listed, filtered or searched here.
-                    Open one by its receipt ID (UUID) or a pasted /p/inward/… link — a JIN number can't be resolved
-                    without a list.
-                  </GapNote>
-                </>
-              )}
-            </div>
-          )}
+          title={filtersActive ? 'No receipts match these filters' : 'No inward receipts this month'}
+          body={filtersActive
+            ? 'Clear the search or change the tab and filters.'
+            : 'Create a JIN when equipment arrives — walk-in or courier. Each unit gets its own Job ID after verification.'}
+          action={!filtersActive ? createButton ?? undefined : statusNeverSet ? (
+            <GapNote code="receipt_status" className="text-left">
+              No API moves a receipt out of REGISTERED, so every JIN stays Registered — On hold, Closed and the other
+              statuses list nothing until the backend advances receipt_status.
+            </GapNote>
+          ) : undefined}
         />
       </StateCard>
     );
   } else {
     body = (
       <>
-        <TableCard className={paged.pages > 1 ? 'min-h-[586px] flex-1' : 'min-h-[656px] flex-1'}>
+        <TableCard className={cx(pages > 1 ? 'min-h-[586px] flex-1' : 'min-h-[656px] flex-1', q.isPlaceholderData && 'opacity-60')}>
           <HeaderRow />
-          {paged.rows.map((r) => <RegisterRowView key={r.id} r={r} menu={menuFor(r)} />)}
+          {rows.map((r) => <RegisterRowView key={r.id} r={r} menu={menuFor(r)} />)}
         </TableCard>
-        <Pagination page={paged.page} pages={paged.pages} onChange={setPage} />
+        <Pagination page={Math.min(page, pages)} pages={pages} onChange={setPage} />
       </>
     );
   }
@@ -211,7 +253,15 @@ export function InwardRegisterPage() {
           <SearchField value={filters.search} onChange={(v) => update({ search: v })} placeholder="Search JIN, customer, DC no." />
           <FilterMenu label="Status" value={filters.status} options={STATUS_OPTIONS} allValue="ALL" onChange={(v) => update({ status: v })} />
           <FilterMenu label="Priority" value={filters.priority} options={PRIORITY_OPTIONS} allValue="ALL" onChange={(v) => update({ priority: v })} />
-          <DateMenu value={filters.date} onChange={(v) => update({ date: v })} />
+          <FilterMenu
+            kind="date"
+            align="end"
+            menuWidth={200}
+            value={filters.date}
+            options={dateOptions()}
+            allValue="m0"
+            onChange={(v) => update({ date: v })}
+          />
         </ToolbarCard>
         {body}
       </PageContent>

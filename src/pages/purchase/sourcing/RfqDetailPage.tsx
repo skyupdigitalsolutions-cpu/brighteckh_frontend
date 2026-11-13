@@ -1,4 +1,4 @@
-// RFQ detail — /p/rfqs/:rfqId (?job=<jobId>&tab=lines|suppliers|offers|history&action=invite|record).
+// RFQ detail — /p/rfqs/:rfqId (?tab=lines|suppliers|offers|history&action=invite|record).
 // Figma: S1 Lines tab 177:121855 · Suppliers tab 177:121899 · History tab 177:122104 · Invite supplier (drawer)
 // 177:121956 · Supplier invited 177:122035 · Record offer (drawer) 177:122122 · Offer recorded 177:122318 · Offer
 // marked valid 177:122472 · Mark invalid (drawer) 177:122603 · Offer marked invalid 177:122762; Offers tab =
@@ -8,16 +8,17 @@
 // the tab bar and the content, as drawn (success for invite/offer/valid, blocked for invalid).
 //
 // API facts / deviations:
-// - GET /rfqs/{id} has no job id and no shortage sources (G?-C2-2). The job is known only when the user came from a
-//   job (?job=…); it is shown only after GET /jobs/{id}/rfqs confirms the RFQ belongs to that job. "Raised from" then
-//   shows the job; material request / shortage / stock-check links carry the GapNote.
-// - No audit/history endpoint (G?-C2-3): History is built from the RFQ's own timestamps (created, sent, invites,
-//   offers, technical checks). Actor names: no employee lookup (G17) → date only.
+// - GET /rfqs/{id} returns job_id / job_number and sources[] (shortage → stock-check line → stock check → MR) and
+//   item_code / item_name per line. "Raised from" (177:121883) = Job · Material request · Shortage (demand qty ·
+//   shortage status from GET /jobs/{id}/shortages) · Stock check (checked_at from GET /jobs/{id}/stock-checks); one
+//   group per distinct source when the RFQ has several lines.
+// - No RFQ history endpoint (C2-3): History is built from the RFQ's own timestamps (created, sent, invites,
+//   offers, technical checks), without actor names.
 // - Offer rows: one per offer line of the selected RFQ line, ranked by `comparable_landed_cost` (DB value). Disc. is
 //   the ₹ amount `quoted_discount` (Figma "%"). The selected row is highlighted; a PENDING selected row shows
 //   Valid / Invalid (Purchase marks validity manually — CLAUDE.md §6). "Best valid" = lowest landed among COMPLIANT.
 // - All cost columns are gated on can.seeSupplierCost(role); writes on can.purchaseWork(role) (hidden otherwise).
-// - The RFQ status is never moved to COMPARED by the API (no endpoint); it is shown as returned.
+// - The RFQ status is never moved to COMPARED by the API (C2-5); it is shown as returned. Cancel RFQ: no endpoint (C2-4).
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { IconCheck, IconFilePlus, IconFileUnknown, IconPlus, IconReceipt, IconUsers, IconX } from '@tabler/icons-react';
@@ -37,10 +38,10 @@ import { useToast } from '../../../ui/desktop/Toast';
 import { formatDate, formatDayTime, formatINR, formatQty } from '../../../lib/format';
 import type { Tone } from '../../../lib/tones';
 import {
-  useJob, useMarkOfferValidity, useRfq, useRfqs,
+  useMarkOfferValidity, useRfq, useShortages, useStockChecks,
   type OfferLine, type Rfq,
 } from '../api';
-import { useItemNames, useJobMaterialRequests, useMaterialRequests, shortId, type ItemName } from './data';
+import { shortId } from './data';
 import { CardHead, Cell, GridHead, GridRow, HCell, ItemTwo, MetaField, Muted, Num, SectionCard, TimelineItem, formatDayMonth } from './ui';
 import { InviteSupplierDrawer, MarkInvalidDrawer, RecordOfferDrawer } from './RfqDrawers';
 import { rfqLabel } from './RfqTable';
@@ -49,8 +50,9 @@ type TabKey = 'lines' | 'suppliers' | 'offers' | 'history';
 type Result = { tone: Tone; title: string; body: string };
 type Row = { line: OfferLine; supplier: string; validUntil: string | null };
 
-const itemName = (names: Map<string, ItemName>, id: string) => names.get(id)?.name ?? `Item ${shortId(id)}`;
-const itemCode = (names: Map<string, ItemName>, id: string) => names.get(id)?.code ?? shortId(id);
+type RfqLine = Rfq['lines'][number];
+const itemName = (l: RfqLine) => l.item_name ?? `Item ${shortId(l.item_bridge_id)}`;
+const itemCode = (l: RfqLine) => l.item_code ?? shortId(l.item_bridge_id);
 const makePart = (l: OfferLine) => [l.offered_make, l.offered_part_number].filter(Boolean).join(' ') || 'Offer';
 
 function offerRows(rfq: Rfq, rfqLineId: string): Row[] {
@@ -72,14 +74,10 @@ export function RfqDetailPage() {
   const canAct = !!role && can.purchaseWork(role);
 
   const rfqQ = useRfq(rfqId);
-  const jobParam = sp.get('job') ?? undefined;
-  const jobRfqs = useRfqs(jobParam);
-  const jobLinked = !!jobParam && !!jobRfqs.data?.some((r) => r.id === rfqId);
-  const jobQ = useJob(jobLinked ? jobParam : undefined);
-  const jobId = jobLinked ? jobParam : undefined;
-  const jobMrs = useJobMaterialRequests(jobId);
-  const anyMrs = useMaterialRequests();
-  const names = useItemNames(jobMrs.submitted?.id ?? jobMrs.forJob[0]?.id ?? anyMrs.data?.[0]?.id).map;
+  const jobId = rfqQ.data?.job_id ?? undefined;
+  const hasSources = (rfqQ.data?.sources.length ?? 0) > 0;
+  const shortagesQ = useShortages(hasSources ? jobId : undefined);
+  const checksQ = useStockChecks(hasSources ? jobId : undefined);
 
   const tab = (['lines', 'suppliers', 'offers', 'history'].includes(sp.get('tab') ?? '') ? sp.get('tab') : 'lines') as TabKey;
   const setTab = (t: TabKey) => setSp((p) => { const n = new URLSearchParams(p); n.set('tab', t); n.delete('action'); n.delete('created'); return n; }, { replace: true });
@@ -152,10 +150,9 @@ export function RfqDetailPage() {
 
   const label = rfqLabel(rfq);
   const first = rfq.lines[0];
-  const meta = [jobQ.data?.job_number, first && itemName(names, first.item_bridge_id), `revision ${rfq.revision_no}`].filter(Boolean).join(' · ');
+  const meta = [rfq.job_number, first && itemName(first), `revision ${rfq.revision_no}`].filter(Boolean).join(' · ');
   const offerLineCount = rfq.offers.reduce((n, o) => n + o.lines.length, 0);
-  const subtitle = [label, first && itemName(names, first.item_bridge_id)].filter(Boolean).join(' · ');
-  const unknownItems = rfq.lines.some((l) => !names.has(l.item_bridge_id));
+  const subtitle = [label, first && itemName(first)].filter(Boolean).join(' · ');
 
   const bestValid = (exclude?: string, include?: OfferLine) => {
     const cands = rows
@@ -181,6 +178,38 @@ export function RfqDetailPage() {
     });
   };
 
+  // ---------------------------------------------------------------- raised from (one group per distinct source)
+  const groups = rfq.sources.filter((src, i, all) => all.findIndex((x) => x.shortage_source_id === src.shortage_source_id) === i);
+  const shortageOf = (id: string) => shortagesQ.data?.find((x) => x.id === id);
+  const checkOf = (id: string) => checksQ.data?.find((x) => x.id === id);
+  const uomOf = (rfqLineId: string) => rfq.lines.find((l) => l.id === rfqLineId)?.uom;
+  const jobLink = rfq.job_id && rfq.job_number ? (
+    <Link to={`/p/jobs/${rfq.job_id}/sourcing`} className="flex shrink-0 flex-col items-start gap-[3px] overflow-clip whitespace-nowrap text-left hover:underline">
+      <span className="text-[12px] leading-[16px] text-fg-2">Job</span>
+      <span className="font-mono text-[13px] font-medium leading-[18px] text-fg">{rfq.job_number}</span>
+    </Link>
+  ) : <MetaField label="Job" mono gap={3}>—</MetaField>;
+  const raisedFrom = groups.length === 0 ? (
+    <div className="flex w-full flex-wrap items-start gap-[44px] overflow-clip">{jobLink}</div>
+  ) : groups.map((src, i) => {
+    const sh = shortageOf(src.shortage_source_id);
+    const ck = checkOf(src.stock_check_id);
+    const loadingSh = shortagesQ.isPending && !!jobId;
+    const loadingCk = checksQ.isPending && !!jobId;
+    return (
+      <div key={src.shortage_source_id} className="flex w-full flex-wrap items-start gap-[44px] overflow-clip">
+        {i === 0 ? jobLink : <div className="w-[55px] shrink-0" aria-hidden />}
+        {groups.length > 1 && <MetaField label="RFQ line" mono gap={3}>{src.line_no}</MetaField>}
+        <MetaField label="Material request" mono gap={3}>{src.material_request_number}</MetaField>
+        <MetaField label="Shortage" mono gap={3}>
+          {formatQty(src.demand_quantity, uomOf(src.rfq_line_id))}
+          {sh ? ` · ${sh.shortage_status.replace(/_/g, ' ')}` : loadingSh ? ' · …' : ''}
+        </MetaField>
+        <MetaField label="Stock check" mono gap={3}>{ck ? formatDayTime(ck.checked_at) : loadingCk ? '…' : '—'}</MetaField>
+      </div>
+    );
+  });
+
   // ---------------------------------------------------------------- tabs content
   const linesTab = (
     <>
@@ -189,9 +218,9 @@ export function RfqDetailPage() {
       )}
       {rfq.lines.map((l) => (
         <SectionCard key={l.id} pad={24}>
-          <CardHead title={`Line ${l.line_no} · ${itemName(names, l.item_bridge_id)}`} right={<StatusPill domain="rfq" value={rfq.rfq_status} />} />
+          <CardHead title={`Line ${l.line_no} · ${itemName(l)}`} right={<StatusPill domain="rfq" value={rfq.rfq_status} />} />
           <div className="flex w-full flex-wrap items-start gap-[44px] overflow-clip">
-            <MetaField label="Item" mono gap={3}>{itemCode(names, l.item_bridge_id)}</MetaField>
+            <MetaField label="Item" mono gap={3}>{itemCode(l)}</MetaField>
             <MetaField label="Quantity" mono gap={3}>{formatQty(l.quantity, l.uom)}</MetaField>
             <MetaField label="Preferred" gap={3}>{l.manufacturer_preference ?? '—'}</MetaField>
             <MetaField label="Needed by" gap={3}>{formatDate(l.desired_delivery_by)}</MetaField>
@@ -201,24 +230,10 @@ export function RfqDetailPage() {
           <p className="w-full text-[14px] leading-[20px] text-fg-2">{l.technical_specification}</p>
         </SectionCard>
       ))}
-      {unknownItems && <GapNote code="G?-C2-1">Some items show the catalogue id only: there is no item lookup by item_bridge_id.</GapNote>}
       <SectionCard pad={24}>
         <CardHead title="Raised from" />
-        <div className="flex w-full flex-wrap items-start gap-[44px] overflow-clip">
-          {jobQ.data ? (
-            <Link to={`/p/jobs/${jobQ.data.id}/sourcing`} className="flex shrink-0 flex-col items-start gap-[3px] overflow-clip whitespace-nowrap text-left hover:underline">
-              <span className="text-[12px] leading-[16px] text-fg-2">Job</span>
-              <span className="font-mono text-[13px] font-medium leading-[18px] text-fg">{jobQ.data.job_number}</span>
-            </Link>
-          ) : (
-            <MetaField label="Job" mono gap={3}>—</MetaField>
-          )}
-          {rfq.notes && <MetaField label="Notes" gap={3}>{rfq.notes}</MetaField>}
-        </div>
-        <GapNote code="G?-C2-2">
-          GET /rfqs/{'{id}'} returns no job, material request, shortage source or stock-check link.
-          {jobQ.data ? ' The job is known because you opened this RFQ from its Sourcing tab.' : ' Open the RFQ from a job\'s Sourcing tab to see the job.'}
-        </GapNote>
+        {raisedFrom}
+        {rfq.notes && <MetaField label="Notes" gap={3}>{rfq.notes}</MetaField>}
       </SectionCard>
     </>
   );
@@ -271,7 +286,7 @@ export function RfqDetailPage() {
           <CardHead title={label} right={<StatusPill domain="rfq" value={rfq.rfq_status} />} />
           {curLine && (
             <div className="flex w-full items-start gap-[32px] overflow-clip whitespace-nowrap">
-              <MetaField label={`Line ${curLine.line_no}`}>{formatQty(curLine.quantity, curLine.uom)} · {itemName(names, curLine.item_bridge_id)}</MetaField>
+              <MetaField label={`Line ${curLine.line_no}`}>{formatQty(curLine.quantity, curLine.uom)} · {itemName(curLine)}</MetaField>
               <div className="min-w-0 max-w-[260px]"><MetaField label="Spec"><span className="block truncate">{curLine.technical_specification}</span></MetaField></div>
               <MetaField label="Preferred">{curLine.manufacturer_preference ?? '—'}</MetaField>
               <MetaField label="Needed by">{formatDate(curLine.desired_delivery_by)}</MetaField>
@@ -404,7 +419,7 @@ export function RfqDetailPage() {
       <div className="flex w-full flex-col">
         {events.map((e, i) => <TimelineItem key={`${e.at}-${i}`} title={e.title} meta={formatDayTime(e.at)} detail={e.detail} last={i === events.length - 1} />)}
       </div>
-      <GapNote code="G?-C2-3">No RFQ audit/history endpoint: this timeline is rebuilt from the RFQ's own timestamps, and actor names are not readable (G17).</GapNote>
+      <GapNote code="C2-3">RFQ history has no actor names: there is no RFQ history endpoint, so this timeline is rebuilt from the RFQ's own timestamps.</GapNote>
     </SectionCard>
   );
 
@@ -443,7 +458,6 @@ export function RfqDetailPage() {
             open={recordOpen}
             onClose={() => setRecordOpen(false)}
             rfq={rfq}
-            names={names}
             jobId={jobId}
             onDone={(o, supplier) => {
               setRecordOpen(false);

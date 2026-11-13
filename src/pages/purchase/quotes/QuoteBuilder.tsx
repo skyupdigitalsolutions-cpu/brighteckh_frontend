@@ -23,23 +23,27 @@
 //   returns no total, so the row shows "—" with a GapNote. Tax total and freight are typed (API inputs).
 // - Material margin: no margin rule exists (BR-10's is UNVERIFIED) → "—" + GapNote. Material cost (landed) is the
 //   DB-generated comparable_landed_cost of the chosen reference offer line.
-// - Release to Sales needs assigned_sales_id; no employee lookup (G17) → UUID field in a drawer.
+// - Release to Sales needs assigned_sales_id → LookupPicker over active SALES employees (GET /lookups/employees).
+//   GET /quotes/{id} does not return assigned_sales_id, so the released banner cannot name the Sales person
+//   (Figma "Anita (Sales)").
 // - The 10 % discount gate is enforced by the DB only; this screen never computes it — it shows the API error and
-//   collects the approver (UUID, G17) + reason, then resends.
+//   collects the approver (LookupPicker over all active employees: the API validates no role) + reason, then resends.
+// - SENT banner: revisions have no sent_at / sender / recipient. The only send record is the BR04_QUOTE_SENT audit
+//   row, which job progress (GET /jobs/{id}/progress, QUOTE stage `at`) exposes as the job's FIRST send — shown as such.
 import { useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IconAlertTriangle, IconFilePlus, IconLock, IconPlus, IconSend, IconShieldCheck, IconX } from '@tabler/icons-react';
-import type { Job, Quote } from '../api';
-import { useReleaseToSales } from '../api';
+import type { Job, Quote, RepairQuoteLineBody } from '../api';
+import { employeeSource, useCreateQuote, useJobProgress, useReleaseToSales, useReviseQuote } from '../api';
 import {
-  Badge, Button, ButtonLink, DateField, Drawer, FormErrors, GapNote, InlineAlert, SelectField, StatusPill, TextInput,
-  cx, Ic, useToast,
+  Badge, Button, ButtonLink, DateField, Drawer, FormErrors, GapNote, InlineAlert, LookupPicker, SelectField, StatusPill,
+  TextInput, cx, Ic, useToast,
 } from '../../../ui/desktop';
 import { apiErrorText } from '../../../api/http';
 import { enumLabel, formatDate, formatDateTime, formatINR, formatQty } from '../../../lib/format';
 import {
-  LINE_TYPES, QUOTE_TYPES, isUuid, useCreateQuoteBr04, useJobOfferLines, useReviseQuoteBr04,
-  type Br04QuoteLineBody, type LineType, type QuoteResponse, type QuoteType, type RevisionWithLines,
+  LINE_TYPES, QUOTE_TYPES, useJobOfferLines,
+  type LineType, type QuoteResponse, type QuoteType, type RevisionWithLines,
 } from './api';
 import { formatPaiseBig, isDecimal, lineTotalPaise, paiseToDec, toPaise } from './money';
 
@@ -123,6 +127,9 @@ function BadgeSelect<V extends string>({ value, options, onChange, label }: { va
 // ------------------------------------------------------------------ banner per state
 function StateBanner({ quote, latest, flash, responses }: { quote: Quote; latest: RevisionWithLines; flash?: Flash; responses: QuoteResponse[] }) {
   const status = latest.quote_status;
+  const progressQ = useJobProgress(status === 'SENT' ? quote.job_id : undefined);
+  const sentStage = progressQ.data?.stages.find((s) => s.key === 'QUOTE');
+  const firstSent = sentStage?.status === 'done' ? sentStage.at : null;
   const mine = responses.filter((r) => r.quote_revision_id === latest.id);
   const last = mine[0];
   if (status === 'DRAFT' && flash && flash.quoteId === quote.id && flash.revNo === latest.revision_no) {
@@ -143,15 +150,19 @@ function StateBanner({ quote, latest, flash, responses }: { quote: Quote; latest
     }
   }
   if (status === 'RELEASED_TO_SALES') {
-    // Figma names the Sales person ("Anita (Sales)"); the handoff row isn't readable and there is no employee lookup (G17).
+    // Figma names the Sales person ("Anita (Sales)"); GET /quotes/{id} does not return assigned_sales_id.
     return <InlineAlert tone="progress" title="Released to Sales">Sales will check and send it to the customer. Prices are now locked.</InlineAlert>;
   }
   if (status === 'SENT') {
     return (
-      <InlineAlert tone="progress" title="Sent to customer · awaiting response">
-        Sales sent revision {latest.revision_no}. Locked — changes need a revision.
-        {last && last.response_type !== 'AWAITING_RESPONSE' && <> Latest customer response: {enumLabel(last.response_type)} · {formatDateTime(last.responded_at)}.</>}
-      </InlineAlert>
+      <>
+        <InlineAlert tone="progress" title="Sent to customer · awaiting response">
+          Sales sent revision {latest.revision_no}. Locked — changes need a revision.
+          {firstSent && <> First sent to the customer on this job: {formatDateTime(firstSent)}.</>}
+          {last && last.response_type !== 'AWAITING_RESPONSE' && <> Latest customer response: {enumLabel(last.response_type)} · {formatDateTime(last.responded_at)}.</>}
+        </InlineAlert>
+        <GapNote code="G-D-5">Sent metadata: there is no sender, recipient or send time per revision beyond the BR04_QUOTE_SENT audit row. The time shown is the job's first send (job progress).</GapNote>
+      </>
     );
   }
   if (status === 'ACCEPTED') {
@@ -217,14 +228,14 @@ export function QuoteBuilder({ job, quote, responses, canWork, canSeeCost, start
   const [form, setForm] = useState(initial);
   const [reason, setReason] = useState('');
   const [showApproval, setShowApproval] = useState(false);
-  const [approver, setApprover] = useState('');
+  const [approver, setApprover] = useState<string | null>(null);
   const [approvalReason, setApprovalReason] = useState('');
   const [attempted, setAttempted] = useState(false);
   const [releaseOpen, setReleaseOpen] = useState(false);
   const dirty = isCreate || JSON.stringify(form) !== JSON.stringify(initial);
 
-  const createM = useCreateQuoteBr04(job.id);
-  const reviseM = useReviseQuoteBr04(quote?.id ?? '', job.id);
+  const createM = useCreateQuote(job.id);
+  const reviseM = useReviseQuote(quote?.id ?? '', job.id);
   const releaseM = useReleaseToSales(quote?.id ?? '', job.id);
   const saveM = isCreate ? createM : reviseM;
   const offers = useJobOfferLines(job.id, canSeeCost);
@@ -257,10 +268,10 @@ export function QuoteBuilder({ job, quote, responses, canWork, canSeeCost, start
   const linesValid = form.lines.length > 0 && form.lines.every((l) => !Object.values(lineErr(l)).some(Boolean));
   const optDecOk = (v: string) => v === '' || isDecimal(v);
   const reasonMissing = !isCreate && !reason.trim();
-  const approvalInvalid = showApproval && (!isUuid(approver) || !approvalReason.trim());
+  const approvalInvalid = showApproval && (!approver || !approvalReason.trim());
 
   function body() {
-    const lines: Br04QuoteLineBody[] = form.lines.map((l) => ({
+    const lines: RepairQuoteLineBody[] = form.lines.map((l) => ({
       line_type: l.line_type,
       line_description: l.line_description.trim(),
       quantity: Number(l.quantity),
@@ -293,7 +304,7 @@ export function QuoteBuilder({ job, quote, responses, canWork, canSeeCost, start
     reviseM.mutate({
       revision_reason: reason.trim(),
       ...body(),
-      ...(showApproval ? { higher_discount_approved_by_id: approver.trim(), higher_discount_reason: approvalReason.trim() } : {}),
+      ...(showApproval && approver ? { higher_discount_approved_by_id: approver, higher_discount_reason: approvalReason.trim() } : {}),
     }, {
       onSuccess: (q) => onFlash({ kind: wasRevise ? 'revised' : 'saved', quoteId: q.id, revNo: q.revision.revision_no, prevNo: latest?.revision_no, at: q.revision.created_at }),
       onError: (e) => {
@@ -430,7 +441,7 @@ export function QuoteBuilder({ job, quote, responses, canWork, canSeeCost, start
               <SumRow label="Material price" value={formatPaiseBig(materialPaise)} />
               <SumRow label="Material margin" value="—" strong tone="success" />
               <div className="flex h-[8px] w-full items-start overflow-clip rounded-[4px] bg-subtle" aria-hidden />
-              <GapNote code="G?-D-3">No margin rule is defined (BR-10's margin is UNVERIFIED), so no margin is computed. Landed cost is the reference offer line's DB value.</GapNote>
+              <GapNote code="G-D-3">No margin rule is defined (BR-10's margin is UNVERIFIED), so no margin is computed. Landed cost is the reference offer line's DB value.</GapNote>
             </CardShell>
           )}
 
@@ -458,7 +469,7 @@ export function QuoteBuilder({ job, quote, responses, canWork, canSeeCost, start
             )}
             <div className="h-px w-full shrink-0 bg-line" />
             <SumRow label="Quote total" value="—" strong />
-            <GapNote code="G?-D-2">Quote total composition (freight / inspection fee) is pending client sign-off; the API stores pre-tax, tax and freight separately and returns no total.</GapNote>
+            <GapNote code="G-D-2">Quote total composition (freight / inspection fee) is an open client decision; the API stores pre-tax, tax and freight separately and returns no total.</GapNote>
 
             {approvalNeededByApi || (showApproval && editable) ? (
               <div className="flex w-full items-start gap-[8px] overflow-clip rounded-[14px] bg-warn-bg px-[12px] py-[10px] text-warn-fg">
@@ -474,17 +485,21 @@ export function QuoteBuilder({ job, quote, responses, canWork, canSeeCost, start
               </div>
             )}
             {editable && !isCreate && (
-              <GapNote code="G?-D-4">The 10 % threshold is an unresolved client decision (CLAUDE.md §6). The server enforces it; this screen only shows its answer.</GapNote>
+              <GapNote code="G-D-4">The 10 % threshold and the approver's role are unresolved client decisions (CLAUDE.md §6). The server enforces the threshold and accepts any active employee as approver; this screen only shows its answer.</GapNote>
             )}
 
             {editable && !isCreate && showApproval && (
               <>
                 <TextInput label="Reason *" value={approvalReason} onChange={(e) => setApprovalReason(e.target.value)} error={attempted && !approvalReason.trim() ? 'Give the reason for the higher discount.' : null} />
-                <TextInput
-                  label="Approved by *" mono placeholder="Employee ID (UUID)" value={approver} onChange={(e) => setApprover(e.target.value)}
-                  error={attempted && !isUuid(approver) ? 'Paste the approver’s employee ID.' : null}
+                <LookupPicker
+                  label="Approved by *"
+                  placeholder="Search employee name or code"
+                  value={approver}
+                  onChange={(id) => setApprover(id)}
+                  source={employeeSource()}
+                  clearable
+                  error={attempted && !approver ? 'Choose the approver.' : null}
                 />
-                <GapNote code="G17">No employee lookup — paste the approver's employee ID. The API checks only that it is an active employee of this company (no role is validated).</GapNote>
               </>
             )}
             {editable && !isCreate && !showApproval && (
@@ -565,9 +580,9 @@ function MoneyRow({ label, value, onChange, invalid }: { label: string; value: s
 function ReleaseDrawer({ open, onClose, onSubmit, busy, error, subtitle }: {
   open: boolean; onClose: () => void; onSubmit: (salesId: string) => void; busy: boolean; error: unknown; subtitle: string;
 }) {
-  const [salesId, setSalesId] = useState('');
+  const [salesId, setSalesId] = useState<string | null>(null);
   const [tried, setTried] = useState(false);
-  const bad = !isUuid(salesId);
+  const bad = !salesId;
   return (
     <Drawer
       open={open}
@@ -575,7 +590,7 @@ function ReleaseDrawer({ open, onClose, onSubmit, busy, error, subtitle }: {
       busy={busy}
       title="Release to Sales"
       subtitle={subtitle}
-      onSubmit={() => { setTried(true); if (!bad) onSubmit(salesId.trim()); }}
+      onSubmit={() => { setTried(true); if (salesId) onSubmit(salesId); }}
       footer={(
         <>
           <Button kind="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
@@ -584,8 +599,15 @@ function ReleaseDrawer({ open, onClose, onSubmit, busy, error, subtitle }: {
       )}
     >
       <p className="text-[14px] leading-[20px] text-fg-2">Prices lock once released. Sales checks the quote and sends it to the customer; any change after that needs a new revision.</p>
-      <TextInput label="Sales person *" mono placeholder="Employee ID (UUID)" value={salesId} onChange={(e) => setSalesId(e.target.value)} error={tried && bad ? 'Paste the Sales employee ID.' : null} />
-      <GapNote code="G17">No employee lookup — paste the Sales person's employee ID. The API checks it is an active SALES employee of this company.</GapNote>
+      <LookupPicker
+        label="Sales person *"
+        placeholder="Search Sales staff by name or code"
+        value={salesId}
+        onChange={(id) => setSalesId(id)}
+        source={employeeSource('SALES')}
+        clearable
+        error={tried && bad ? 'Choose the Sales person.' : null}
+      />
       <FormErrors error={error} title="The quote wasn't released" />
     </Drawer>
   );

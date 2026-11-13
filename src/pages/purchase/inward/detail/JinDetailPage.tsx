@@ -6,22 +6,22 @@
 // title row (JIN 20/26 mono Medium · Priority flag · Status badge · spacer · secondary "Add equipment group") and
 // meta grid (gap 40) · then one card per equipment group, or the empty-state card.
 // Loading / error / not-found use the kit states (StateCard + ErrorState / EmptyState).
-// G16: no customer lookup → the Customer cell shows the customer id.
+// Names: customer via useCustomersByIds, group assemblies via useAssembliesByIds. Unit → Job from equipment_units[].job_id.
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { IconChevronLeft, IconFileSearch, IconPackage, IconPlus } from '@tabler/icons-react';
 import {
-  Button, ButtonLink, EmptyState, GapNote, GlassCard, Ic, InlineAlert, PageContent, PageHeader, PriorityChip,
+  Button, ButtonLink, EmptyState, GlassCard, Ic, InlineAlert, PageContent, PageHeader, PriorityChip,
   QueryView, StateCard, StatusPill, useToast,
 } from '../../../../ui/desktop';
 import { enumLabel, formatDateTime } from '../../../../lib/format';
 import { useAuth } from '../../../../auth/AuthProvider';
 import { can } from '../../../../auth/access';
-import { useReceipt, type EquipmentUnit, type InwardReceipt } from '../../api';
+import { useAssembliesByIds, useCustomersByIds, useReceipt, type EquipmentUnit, type InwardReceipt } from '../../api';
 import { AddGroupDrawer } from './AddGroupDrawer';
 import { AssignEngineerDrawer } from './AssignEngineerDrawer';
-import { GroupCard, groupLabel } from './GroupCard';
-import { formatDayMonth, isUuid, MetaItem, shortId, useUnitJobs, type UnitJob } from './local';
+import { GroupCard, groupLabel, type UnitJob } from './GroupCard';
+import { formatDayMonth, isUuid, MetaItem, shortId } from './local';
 import { VerifyUnitDrawer } from './VerifyUnitDrawer';
 
 function Breadcrumb({ jin }: { jin?: string }) {
@@ -99,7 +99,13 @@ function JinDetail({ receipt: r }: { receipt: InwardReceipt }) {
   const toast = useToast();
   const loc = useLocation();
   const createdJin = (loc.state as { created?: string } | null)?.created;
-  const { jobs, remember } = useUnitJobs(r.id);
+  const customers = useCustomersByIds([r.customer_id]);
+  const customer = customers.data?.[r.customer_id];
+  const assemblies = useAssembliesByIds(r.equipment_groups.map((g) => g.assembly_id));
+  const fullLabel = (g: InwardReceipt['equipment_groups'][number]) => {
+    const name = assemblies.data?.[g.assembly_id]?.assembly_name;
+    return name ? `${groupLabel(g)} · ${name}` : groupLabel(g);
+  };
   const [addOpen, setAddOpen] = useState(false);
   const [verifyT, setVerifyT] = useState<VerifyTarget | null>(null);
   const [assignT, setAssignT] = useState<AssignTarget | null>(null);
@@ -119,7 +125,7 @@ function JinDetail({ receipt: r }: { receipt: InwardReceipt }) {
       for (const g of groups) {
         const units = unitsOf(g.id);
         const index = units.findIndex((u) => u.verification_status !== 'VERIFIED');
-        if (index >= 0) { setVerifyT({ unit: units[index], index, total: units.length, group: groupLabel(g) }); break; }
+        if (index >= 0) { setVerifyT({ unit: units[index], index, total: units.length, group: fullLabel(g) }); break; }
       }
     }
     const next = new URLSearchParams(params);
@@ -157,7 +163,9 @@ function JinDetail({ receipt: r }: { receipt: InwardReceipt }) {
             {addButton}
           </div>
           <div className="flex flex-wrap items-start gap-x-[40px] gap-y-[12px] overflow-clip">
-            <MetaItem label="Customer" value={shortId(r.customer_id)} mono title={r.customer_id} />
+            {customer
+              ? <MetaItem label="Customer" value={customer.customer_name} title={customer.customer_code} />
+              : <MetaItem label="Customer" value={customers.isPending ? '…' : shortId(r.customer_id)} mono title={r.customer_id} />}
             <MetaItem label="Received" value={formatDateTime(r.receipt_at)} />
             <MetaItem label="Channel" value={channel} />
             <MetaItem label="AWB" value={r.courier_awb || '—'} mono />
@@ -172,7 +180,6 @@ function JinDetail({ receipt: r }: { receipt: InwardReceipt }) {
           </div>
           {r.priority_reason && <p className="text-[14px] leading-[20px] text-fg-2">Priority reason: {r.priority_reason}</p>}
           {r.notes && <p className="text-[14px] leading-[20px] text-fg-2">Notes: {r.notes}</p>}
-          <GapNote code="G16">No customer lookup in the API — the customer is shown by ID.</GapNote>
         </GlassCard>
 
         {groups.length === 0 ? (
@@ -194,11 +201,11 @@ function JinDetail({ receipt: r }: { receipt: InwardReceipt }) {
                 key={g.id}
                 receipt={r}
                 group={g}
+                assembly={assemblies.data?.[g.assembly_id]}
                 units={units}
-                jobs={jobs}
                 canWork={canWork}
                 fill={groups.length === 1}
-                onVerify={(unit, index) => setVerifyT({ unit, index, total: units.length, group: groupLabel(g) })}
+                onVerify={(unit, index) => setVerifyT({ unit, index, total: units.length, group: fullLabel(g) })}
                 onAssign={(_u, index, job: UnitJob) => setAssignT({ jobId: job.jobId, jobNumber: job.jobNumber, unitText: `unit ${index + 1} of ${r.jin_number}` })}
               />
             );
@@ -218,7 +225,6 @@ function JinDetail({ receipt: r }: { receipt: InwardReceipt }) {
           groupLabel={verifyT.group}
           onVerified={(res) => {
             const t = verifyT;
-            remember(t.unit.id, { jobId: res.job.id, jobNumber: res.job.job_number });
             setVerifyT(null);
             setAssignT({
               jobId: res.job.id,
@@ -238,7 +244,7 @@ function JinDetail({ receipt: r }: { receipt: InwardReceipt }) {
           jobNumber={assignT.jobNumber}
           unitText={assignT.unitText}
           created={assignT.created}
-          onAssigned={() => toast({ tone: 'success', title: `${assignT.jobNumber} assigned`, body: 'Assignment is PENDING until the engineer accepts custody.' })}
+          onAssigned={(name) => toast({ tone: 'success', title: `${assignT.jobNumber} assigned to ${name}`, body: 'Assignment is PENDING until the engineer accepts custody.' })}
         />
       )}
     </>

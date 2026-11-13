@@ -3,12 +3,11 @@
 // stepper (44px square buttons, 1px border-strong, radius 14, gap 10; value 90 wide, Data/Number strong 14/20 mono
 // SemiBold) + helper · Customer DC line (mono). Footer: Cancel + "Add group".
 // POST /inward-receipts/{id}/equipment-groups (CreateEquipmentGroupDto: assembly_id, quantity_received, customer_dc_line?).
-// G19: equipment groups reference `assemblies`, which has no list endpoint (/masters/assemblies is a different
-// table) → the slot takes the assembly UUID + GapNote.
+// Equipment = kit LookupPicker over GET /lookups/assemblies (assemblySource — the shared `assemblies` table that
+// equipment groups reference, not /masters/assemblies). Status acceptance stays the DB's call.
 import { useState } from 'react';
-import { Button, Drawer, Field, FormErrors, GapNote, TextInput } from '../../../../ui/desktop';
-import { useAddEquipmentGroup, type InwardReceipt } from '../../api';
-import { isUuid } from './local';
+import { Button, Drawer, Field, FormErrors, LookupPicker, TextInput } from '../../../../ui/desktop';
+import { assemblySource, useAddEquipmentGroup, type InwardReceipt } from '../../api';
 
 export function AddGroupDrawer({ open, onClose, receipt }: { open: boolean; onClose: () => void; receipt: InwardReceipt }) {
   const [assembly, setAssembly] = useState('');
@@ -19,7 +18,7 @@ export function AddGroupDrawer({ open, onClose, receipt }: { open: boolean; onCl
 
   const n = /^\d+$/.test(qty.trim()) ? Number(qty.trim()) : NaN;
   const errs = {
-    assembly: !assembly.trim() ? 'Enter the assembly ID' : !isUuid(assembly) ? 'Assembly ID is a UUID' : null,
+    assembly: !assembly ? 'Choose the equipment (assembly)' : null,
     qty: !Number.isInteger(n) || n < 1 ? 'Enter a whole number of units, 1 or more' : null,
   };
   const reset = () => { setAssembly(''); setQty('1'); setDcLine(''); setTouched(false); add.reset(); };
@@ -29,7 +28,7 @@ export function AddGroupDrawer({ open, onClose, receipt }: { open: boolean; onCl
     setTouched(true);
     if (errs.assembly || errs.qty) return;
     add.mutate(
-      { assembly_id: assembly.trim(), quantity_received: n, ...(dcLine.trim() ? { customer_dc_line: dcLine.trim() } : {}) },
+      { assembly_id: assembly, quantity_received: n, ...(dcLine.trim() ? { customer_dc_line: dcLine.trim() } : {}) },
       { onSuccess: () => { reset(); onClose(); } },
     );
   };
@@ -50,17 +49,16 @@ export function AddGroupDrawer({ open, onClose, receipt }: { open: boolean; onCl
         </>
       }
     >
-      <TextInput
+      <LookupPicker
         label="Equipment (assembly) *"
-        mono
         autoFocus
-        placeholder="Assembly ID (UUID)"
-        value={assembly}
-        onChange={(e) => setAssembly(e.target.value)}
+        placeholder="Select equipment"
+        value={assembly || null}
+        onChange={(id) => setAssembly(id ?? '')}
+        source={assemblySource}
         error={touched ? errs.assembly : null}
         helper="Only APPROVED / ACTIVE assemblies"
       />
-      <GapNote code="G19">No list of customer-equipment assemblies in the API — enter the assembly ID.</GapNote>
       <Field
         label="Quantity received *"
         error={touched ? errs.qty : null}
