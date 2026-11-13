@@ -46,9 +46,41 @@ const materialReturn: Map<S<'Br07MaterialReturnsRow'>['return_status']> = { REQU
 const consumption: Map<S<'Br07MaterialConsumptionsRow'>['consumption_status']> = { PENDING_POST: 'neutral', POSTED: 'success' };
 const reviewDecision: Map<S<'Br07TestFailureReviewsRow'>['decision']> = { CONTINUE: 'progress', STOP: 'blocked' };
 
+// ---- Purchase desktop (BR-02 intake + BR-04 sourcing/quote) — same catalogue, rows 3:97, 3:118, 3:220,
+// 3:241, 3:253, 11:461, 11:512, 11:530, 11:548.
+const receipt: Map<S<'InwardReceiptDetail'>['receipt_status']> = {
+  REGISTERED: 'neutral', VERIFYING: 'progress', VERIFIED: 'success', ON_HOLD: 'blocked', REJECTED: 'blocked', CLOSED: 'neutral',
+};
+const unitVerification: Map<S<'InwardEquipmentUnitsRow'>['verification_status']> = {
+  PENDING: 'neutral', VERIFIED: 'success', ON_HOLD: 'blocked', REJECTED: 'blocked',
+};
+const dcException: Map<S<'InwardReceiptDetail'>['dc_exception_status']> = {
+  NONE: 'neutral', PENDING: 'progress', RESOLVED: 'success', REJECTED: 'blocked',
+};
+const rfq: Map<S<'Br04RfqsRow'>['rfq_status']> = {
+  DRAFT: 'neutral', SENT: 'progress', OFFERS_RECEIVED: 'progress', COMPARED: 'success', CANCELLED: 'blocked', EXPIRED: 'blocked',
+};
+const offerTechnical: Map<S<'Br04SupplierOfferLinesRow'>['technical_status']> = {
+  PENDING: 'neutral', COMPLIANT: 'success', NONCOMPLIANT: 'blocked',
+};
+const quote: Map<S<'Br04CustomerQuoteRevisionsRow'>['quote_status']> = {
+  DRAFT: 'neutral', RELEASED_TO_SALES: 'progress', SENT: 'progress', ACCEPTED: 'success', REJECTED: 'blocked',
+  EXPIRED: 'blocked', SUPERSEDED: 'neutral',
+};
+const shortage: Map<S<'Br04ShortageSourcesRow'>['shortage_status']> = {
+  OPEN: 'blocked', IN_RFQ: 'progress', PRICE_AVAILABLE: 'success', UNAVAILABLE: 'blocked', CLOSED: 'neutral',
+};
+const invite: Map<S<'Br04RfqSupplierInvitesRow'>['invitation_status']> = {
+  INVITED: 'neutral', SENT: 'progress', RESPONDED: 'success', DECLINED: 'blocked', NO_RESPONSE: 'blocked',
+};
+const offer: Map<S<'OfferRecorded'>['status']> = {
+  RECEIVED: 'success', EXPIRED: 'blocked', REVALIDATION_REQUIRED: 'blocked', WITHDRAWN: 'neutral',
+};
+
 export const TONES = {
   job, assignment, route, session, inspectionReport, reportVersion, outcome, materialRequest, changeRequest,
   itemStatus, repairReport, testResult, issue, slaState, reviewDecision, materialReturn, consumption,
+  receipt, unitVerification, dcException, rfq, offerTechnical, quote, shortage, invite, offer,
 } as const;
 export type ToneDomain = keyof typeof TONES;
 

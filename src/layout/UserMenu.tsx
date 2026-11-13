@@ -1,13 +1,19 @@
-// Figma "Global · User menu" (177:110716): name, login · ROLE, company, Sign out.
-// Theme / profile / help entries are omitted — no backing endpoints or scope in this pass.
-import { useEffect, useRef, useState } from 'react';
-import { IconLogout } from '@tabler/icons-react';
+// Figma "Global · User menu" (177:110716 → menu 177:110906): 280 wide, right-aligned 8px under the user block,
+// scrim .4, popover surface. Who block (pt-8 pb-10 px-12, gap 2): name 14/20 Medium, "login · ROLE" 12/16
+// secondary, "Company: … (CODE)" 12/16 muted; 1px divider; items (18px icon + 14/20 label, gap 12).
+// Real data: GET /auth/me (name, login_id, role) + company name/code; Sign out = POST /auth/logout.
+// "My profile" and "Help & shortcuts" are not rendered (no screen / content exists); the Theme entry is shown
+// with "Dark theme not built yet" (light only in this release).
+import { useState } from 'react';
+import { IconLogout, IconMoon, IconX } from '@tabler/icons-react';
 import { useAuth, useMe } from '../auth/AuthProvider';
 import { ROLE_LABEL } from '../auth/access';
-import { BottomSheet, Button, cx } from '../ui/primitives';
+import { BottomSheet, Button } from '../ui/primitives';
+import { Avatar, initials as initialsOf } from '../ui/desktop/Avatar';
+import { ActionItem, MenuDivider, MenuSurface } from '../ui/desktop/Menu';
+import { Popover, useAnchor } from '../ui/desktop/Popover';
 
-export const initials = (name: string) =>
-  name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('') || '?';
+export const initials = initialsOf;
 
 function Identity() {
   const me = useMe();
@@ -25,54 +31,50 @@ function Identity() {
   );
 }
 
-/** Desktop: avatar + name/role button with a dropdown. */
+/** Desktop: the top-nav "User" block (avatar 40 brand gradient + name 14/20 Medium + role 12/16 secondary) + menu. */
 export function UserMenuDesktop() {
   const me = useMe();
-  const { logout } = useAuth();
-  const [open, setOpen] = useState(false);
+  const { logout, companyName, companyCode } = useAuth();
+  const a = useAnchor<HTMLButtonElement>();
   const [busy, setBusy] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
-  }, [open]);
 
   return (
-    <div ref={ref} className="relative">
+    <>
       <button
+        ref={a.ref}
         type="button"
         aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 hover:bg-subtle"
+        aria-expanded={a.open}
+        onClick={a.toggle}
+        className="flex shrink-0 items-center gap-[10px] overflow-clip pr-[8px] text-left"
       >
-        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-sm font-semibold text-white">{initials(me.full_name)}</span>
-        <span className="hidden text-left leading-tight md:block">
-          <span className="block text-sm font-semibold">{me.full_name}</span>
-          <span className="block text-xs text-fg-2">{ROLE_LABEL[me.role]}</span>
+        <Avatar name={me.full_name} brand size={40} />
+        <span className="flex flex-col items-start overflow-clip whitespace-nowrap">
+          <span className="text-[14px] font-medium leading-[20px] text-fg">{me.full_name}</span>
+          <span className="text-[12px] leading-[16px] text-fg-2">{ROLE_LABEL[me.role]}</span>
         </span>
       </button>
-      {open && (
-        <div role="menu" className="absolute right-0 top-full z-40 mt-2 w-72 rounded-xl border border-line bg-surface p-4 shadow-lg">
-          <Identity />
-          <div className="my-3 h-px bg-line" />
-          <button
-            type="button"
-            role="menuitem"
+      <Popover open={a.open} onClose={a.close} anchorRef={a.ref} align="end" scrim={0.4} width={280} label="Account">
+        <MenuSurface variant="popover">
+          <div className="flex w-full flex-col items-start gap-[2px] overflow-clip whitespace-nowrap px-[12px] pb-[10px] pt-[8px]">
+            <p className="text-[14px] font-medium leading-[20px] text-fg">{me.full_name}</p>
+            <p className="text-[12px] leading-[16px] text-fg-2">{me.login_id} · {me.role}</p>
+            <p className="text-[12px] leading-[16px] text-fg-muted">
+              Company: {companyName ?? '…'}{companyCode ? ` (${companyCode})` : ''}
+            </p>
+          </div>
+          <MenuDivider />
+          <ActionItem icon={IconMoon} label="Theme · Light" sub="Dark theme not built yet" disabled />
+          <ActionItem
+            icon={IconX}
+            label={busy ? 'Signing out…' : 'Sign out'}
+            tone="brand"
             disabled={busy}
             onClick={async () => { setBusy(true); await logout(); }}
-            className={cx('flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-st-blocked-fg hover:bg-st-blocked-bg', busy && 'opacity-60')}
-          >
-            <IconLogout size={18} /> Sign out
-          </button>
-        </div>
-      )}
-    </div>
+          />
+        </MenuSurface>
+      </Popover>
+    </>
   );
 }
 

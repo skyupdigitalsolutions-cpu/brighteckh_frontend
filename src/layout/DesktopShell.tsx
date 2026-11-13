@@ -1,14 +1,34 @@
-// Figma "Shell / Top nav · <role>" (D·P0 Purchase overview): floating white bar, logo, nav pills
-// (active = brand red), company indicator, user menu. Nav items come from the role in GET /auth/me;
-// items a role can't use are not rendered at all (rule: hidden, not disabled).
-import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom';
-import { IconBuildingFactory2, IconTools } from '@tabler/icons-react';
+// Desktop shell for every non-engineer role (Purchase at /p, others at /m).
+// Figma "D·P0 · Purchase overview" 177:102544: canvas = 4 radial washes over #efedec; padding 24 top / 28 sides /
+// 28 bottom; vertical stack gap 20: "Shell / Top nav · <role>" (177:102545) → page header → content.
+// Pages render <PageHeader/> + <PageContent> themselves (they are direct children of the gap-20 stack).
+//
+// Top nav (72 tall, glass, radius 36, pl-20 pr-12 py-12, gap 20):
+//   Brand (mark 36×35.5 + wordmark 112×9.2 over "JMS" 11/14 SemiBold secondary, gap 10 / 3)
+//   Nav (flex-1, centred, gap 2): pill h-44 px-13 radius 22, 14/20; active = brand gradient + drop shadow
+//     0 6 8 rgba(173,51,38,.3) + Medium white; default = Regular secondary.
+//   Right (gap 8): theme toggle (subtle, p-4, gap 2, radius 22; 36px segments, active = accent fill),
+//     search (44 round subtle, 20px icon), notifications (44 round subtle, 20px bell), company indicator
+//     (company-accent, pl-10 pr-12 py-8, radius 18, 16px building + Data/ID white), 1×28 divider, user block.
+// Items a role can't use are not rendered at all (rule: hidden, not disabled).
+import { Link, Navigate, Outlet, useLocation } from 'react-router-dom';
+import { IconBell, IconBuildingFactory2, IconMoon, IconSearch, IconSun, IconTools } from '@tabler/icons-react';
 import type { Role } from '../api/types';
 import { useAuth, useMe } from '../auth/AuthProvider';
-import { homeFor, navFor, ROLE_LABEL } from '../auth/access';
-import { cx, EmptyState } from '../ui/primitives';
+import { homeFor, isNavActive, navFor, ROLE_LABEL } from '../auth/access';
+import { Ic, cx } from '../ui/desktop/Icon';
+import { IconButton } from '../ui/desktop/Button';
+import { EmptyState, StateCard } from '../ui/desktop/States';
+import { GapNote } from '../ui/desktop/Feedback';
+import { MenuSurface } from '../ui/desktop/Menu';
+import { Popover, useAnchor } from '../ui/desktop/Popover';
+import { ToastProvider } from '../ui/desktop/Toast';
+import { PageHeader } from '../ui/desktop/PageHeader';
+import { PageContent } from '../ui/desktop/Glass';
 import { UserMenuDesktop } from './UserMenu';
+import { NotificationsPanel, SearchPalette } from './GlobalOverlays';
 import logoMark from '../assets/brand/logo-mark.svg';
+import logoWordmark from '../assets/brand/logo-wordmark.svg';
 
 /** Route guard by role: a role that can't use a section is sent to its own home. */
 export function RoleGate({ roles }: { roles: Role[] }) {
@@ -17,66 +37,145 @@ export function RoleGate({ roles }: { roles: Role[] }) {
   return <Outlet />;
 }
 
+/** Read-only company indicator (Figma "Company indicator"). Code = legal entity (BLR / CHN) of the signed-in user. */
 export function CompanyBadge() {
-  const { companyCode } = useAuth();
+  const { companyCode, companyName } = useAuth();
   return (
     <span
-      className="inline-flex h-8 items-center gap-1.5 rounded-full bg-company-accent px-3 font-mono text-[13px] font-medium text-white"
-      title="Company (from your login — switching is not available)"
+      className="inline-flex shrink-0 items-center gap-[6px] overflow-clip rounded-t-chip bg-company-accent py-[8px] pl-[10px] pr-[12px] text-fg-inverse"
+      title={companyName ? `${companyName} — from your login; switching company is not available` : 'Company from your login'}
     >
-      <IconBuildingFactory2 size={16} /> {companyCode ?? '…'}
+      <Ic icon={IconBuildingFactory2} size={16} />
+      <span className="whitespace-nowrap font-mono text-[13px] font-medium leading-[18px]">{companyCode ?? '…'}</span>
     </span>
   );
 }
 
-export function DesktopShell() {
-  const me = useMe();
-  const items = navFor(me.role);
+function ThemeToggle() {
+  const a = useAnchor<HTMLButtonElement>();
   return (
-    <div className="min-h-full bg-canvas">
-      <div className="sticky top-0 z-30 px-4 pt-4 md:px-6">
-        <header className="mx-auto flex h-16 max-w-[1392px] items-center gap-4 rounded-2xl border border-line bg-surface px-4 shadow-sm">
-          <div className="flex shrink-0 items-center gap-2">
-            <img src={logoMark} alt="" width={32} height={32} className="h-8 w-8" />
-            <div className="hidden leading-tight sm:block">
-              <p className="text-[12px] font-bold tracking-[0.04em] text-brand-logo">BRIGHTECH GROUP</p>
-              <p className="text-[12px] font-semibold text-fg">JMS</p>
-            </div>
-          </div>
-          <nav aria-label="Main" className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
-            {items.map((it) => (
-              <NavLink
-                key={it.to}
-                to={it.to}
-                className={({ isActive }) => cx(
-                  'whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-medium transition-colors',
-                  isActive ? 'bg-accent text-white' : 'text-fg-2 hover:bg-subtle hover:text-fg',
-                )}
-              >
-                {it.label}
-              </NavLink>
-            ))}
-          </nav>
-          <CompanyBadge />
-          <UserMenuDesktop />
-        </header>
-      </div>
-      <main className="mx-auto max-w-[1392px] px-4 py-6 md:px-6">
-        <Outlet />
-      </main>
+    <div className="flex shrink-0 items-center gap-[2px] rounded-t-pill bg-subtle p-[4px]" role="group" aria-label="Theme">
+      <span className="flex h-[36px] w-[36px] items-center justify-center overflow-clip rounded-t-chip bg-accent text-fg-inverse" aria-label="Light theme (current)">
+        <Ic icon={IconSun} size={18} />
+      </span>
+      <button
+        ref={a.ref}
+        type="button"
+        aria-label="Dark theme (not built yet)"
+        title="Dark theme isn't built yet"
+        onClick={a.toggle}
+        className="flex h-[36px] w-[36px] items-center justify-center overflow-clip rounded-t-chip text-fg-2"
+      >
+        <Ic icon={IconMoon} size={18} />
+      </button>
+      <Popover open={a.open} onClose={a.close} anchorRef={a.ref} align="end" scrim={0} width={300} label="Dark theme">
+        <MenuSurface variant="popover">
+          <GapNote code="THEME">Dark theme isn't built yet — this release ships the light theme only.</GapNote>
+        </MenuSurface>
+      </Popover>
     </div>
   );
 }
 
+function TopNav() {
+  const me = useMe();
+  const loc = useLocation();
+  const items = navFor(me.role);
+  const notif = useAnchor<HTMLButtonElement>();
+  const search = useAnchor<HTMLButtonElement>();
+
+  return (
+    <div className="glass flex h-[72px] w-full shrink-0 items-center gap-[20px] rounded-t-nav py-[12px] pl-[20px] pr-[12px]">
+      <Link to={homeFor(me.role)} className="flex shrink-0 items-center gap-[10px] overflow-clip" aria-label="Brightech JMS home">
+        <img src={logoMark} alt="" className="h-[35.5px] w-[36px] shrink-0" />
+        <span className="flex flex-col items-start gap-[3px] overflow-clip">
+          <img src={logoWordmark} alt="Brightech Group" className="h-[9.2px] w-[112px] shrink-0" />
+          <span className="whitespace-nowrap text-[11px] font-semibold leading-[14px] tracking-[0.44px] text-fg-2">JMS</span>
+        </span>
+      </Link>
+
+      <nav aria-label="Main" className="flex min-w-px flex-1 items-center justify-center gap-[2px] overflow-x-auto">
+        {items.map((it) => {
+          const active = isNavActive(it, loc.pathname);
+          return (
+            <Link
+              key={it.to}
+              to={it.to}
+              aria-current={active ? 'page' : undefined}
+              className={cx(
+                'flex h-[44px] shrink-0 items-center justify-center whitespace-nowrap rounded-t-pill px-[13px] text-[14px] leading-[20px]',
+                active ? 'pill-active-shadow bg-brand-gradient font-medium text-fg-inverse' : 'font-normal text-fg-2 hover:text-fg',
+              )}
+            >
+              {it.label}
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className="flex shrink-0 items-center gap-[8px] overflow-clip">
+        <ThemeToggle />
+        <IconButton ref={search.ref} label="Search" onClick={search.toggle}>
+          <Ic icon={IconSearch} size={20} />
+        </IconButton>
+        <IconButton ref={notif.ref} label="Notifications" onClick={notif.toggle} aria-expanded={notif.open}>
+          <Ic icon={IconBell} size={20} />
+        </IconButton>
+        <CompanyBadge />
+        <span className="h-[28px] w-px shrink-0 bg-line" aria-hidden />
+        <UserMenuDesktop />
+      </div>
+
+      <NotificationsPanel open={notif.open} onClose={notif.close} anchorRef={notif.ref} />
+      <SearchPalette open={search.open} onClose={search.close} />
+    </div>
+  );
+}
+
+export function DesktopShell() {
+  return (
+    <ToastProvider>
+      <div className="bg-desktop-canvas min-h-full">
+        <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-[20px] px-[28px] pb-[28px] pt-[24px]">
+          <TopNav />
+          <Outlet />
+        </div>
+      </div>
+    </ToastProvider>
+  );
+}
+
+/** A section in the role's nav that has no screens yet. */
 export function NotBuiltPage() {
   const me = useMe();
   const loc = useLocation();
-  const item = navFor(me.role).find((i) => loc.pathname.startsWith(i.to));
+  const item = navFor(me.role).find((i) => isNavActive(i, loc.pathname));
   return (
-    <EmptyState icon={<IconTools size={28} />} title={item ? `${item.label} isn't built yet` : `Nothing here for ${ROLE_LABEL[me.role]} yet`}>
-      {item
-        ? 'This pass delivers the shell and the Engineer flow. This module is next in the flow-by-flow build.'
-        : 'Your role has no screens in the current design scope (Figma open question G7).'}
-    </EmptyState>
+    <>
+      <PageHeader title={item?.label ?? ROLE_LABEL[me.role]} meta="Not built in this release." />
+      <PageContent>
+        <StateCard>
+          <EmptyState
+            icon={IconTools}
+            title={item ? `${item.label} isn't built yet` : `Nothing here for ${ROLE_LABEL[me.role]} yet`}
+            body={item ? 'This module is next in the flow-by-flow build.' : 'Your role has no screens in the current design scope (Figma open question G7).'}
+          />
+        </StateCard>
+      </PageContent>
+    </>
+  );
+}
+
+/** Temporary element for a /p route whose screen is built by a screen group; the coordinator replaces it. */
+export function RoutePlaceholder({ name }: { name: string }) {
+  return (
+    <>
+      <PageHeader title={name} meta="Screen placeholder." />
+      <PageContent>
+        <StateCard>
+          <EmptyState icon={IconTools} title={`${name} — placeholder`} body="This route is mounted; its screen is wired in by the screen group." />
+        </StateCard>
+      </PageContent>
+    </>
   );
 }

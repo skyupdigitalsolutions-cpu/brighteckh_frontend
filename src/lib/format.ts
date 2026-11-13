@@ -60,6 +60,21 @@ export function formatDateTime(iso: string | null | undefined): string {
 export const formatTime = (iso: string | null | undefined) => (iso ? tf.format(new Date(iso)) : '—');
 export const formatDate = (iso: string | null | undefined) => (iso ? df.format(new Date(iso)) : '—');
 
+const dmtf = new Intl.DateTimeFormat('en-GB', {
+  timeZone: IST, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
+});
+const myf = new Intl.DateTimeFormat('en-GB', { timeZone: IST, month: 'short', year: 'numeric' });
+
+/** ISO -> "05 Nov, 09:20" in IST (desktop register "Received" column, Figma 177:102734). */
+export function formatDayTime(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return dmtf.format(d);
+}
+/** ISO / Date -> "Nov 2026" in IST (desktop date filter label). */
+export const formatMonthYear = (d: string | Date) => myf.format(typeof d === 'string' ? new Date(d) : d);
+
 /** seconds -> "01:24:37" */
 export function formatDuration(totalSeconds: number | string | null | undefined): string {
   const n = Math.max(0, Math.floor(Number(totalSeconds ?? 0)) || 0);

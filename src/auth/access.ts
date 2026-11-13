@@ -3,22 +3,26 @@
 // cost / margin is absent for Engineer and Sales — components take `canSeeCost` and omit the column.
 import type { Role } from '../api/types';
 
-export type NavItem = { to: string; label: string; built: boolean };
+/**
+ * `to` = pill target. The pill is active when the path equals `to` (`end`) or starts with `to` or any `match`
+ * prefix — e.g. the Sourcing pill stays active on /p/rfqs/:id.
+ */
+export type NavItem = { to: string; label: string; built: boolean; end?: boolean; match?: string[] };
 
-// Purchase labels are the Figma "Shell / Top nav · Purchase" pills. Other roles follow the
-// "Who sees what" matrix (00 · Foundations) — only the Engineer flow is built in this pass.
+// Purchase labels are the Figma "Shell / Top nav · Purchase" pills (177:102545), routed under /p.
+// Other roles follow the "Who sees what" matrix (00 · Foundations) and are not built yet (/m).
 const NAV: Record<Role, NavItem[]> = {
   ENGINEER: [{ to: '/jobs', label: 'My jobs', built: true }],
   PURCHASE: [
-    { to: '/m/dashboard', label: 'Dashboard', built: false },
-    { to: '/m/inward', label: 'Inward', built: false },
-    { to: '/m/jobs', label: 'Jobs', built: false },
-    { to: '/m/requests', label: 'Requests', built: false },
-    { to: '/m/sourcing', label: 'Sourcing', built: false },
-    { to: '/m/quotes', label: 'Quotes', built: false },
-    { to: '/m/orders', label: 'Orders', built: false },
-    { to: '/m/inventory', label: 'Inventory', built: false },
-    { to: '/m/masters', label: 'Masters', built: false },
+    { to: '/p', label: 'Dashboard', built: true, end: true },
+    { to: '/p/inward', label: 'Inward', built: true },
+    { to: '/p/jobs', label: 'Jobs', built: true },
+    { to: '/p/requests', label: 'Requests', built: false },
+    { to: '/p/sourcing', label: 'Sourcing', built: true, match: ['/p/rfqs'] },
+    { to: '/p/quotes', label: 'Quotes', built: true },
+    { to: '/p/orders', label: 'Orders', built: false },
+    { to: '/p/inventory', label: 'Inventory', built: false },
+    { to: '/p/masters', label: 'Masters', built: false },
   ],
   SALES: [{ to: '/m/quotes', label: 'Quotes', built: false }],
   STORES_QUALITY: [
@@ -42,10 +46,18 @@ const NAV: Record<Role, NavItem[]> = {
 export const navFor = (role: Role) => NAV[role] ?? [];
 export const homeFor = (role: Role) => (role === 'ENGINEER' ? '/jobs' : navFor(role)[0]?.to ?? '/m/none');
 
+export function isNavActive(item: NavItem, pathname: string) {
+  const p = pathname.replace(/\/+$/, '') || '/';
+  if (item.end) return p === item.to;
+  return [item.to, ...(item.match ?? [])].some((m) => p === m || p.startsWith(m + '/'));
+}
+
 /** Mirrors the backend @Roles(...) on each route used by the UI. */
 export const can = {
   engineerWork: (r: Role) => r === 'ENGINEER', // custody, sessions, reports, material requests, tests, handoff
   seeSupplierCost: (r: Role) => r === 'PURCHASE' || r === 'MANAGEMENT',
+  /** BR-02 intake (JIN, groups, expand, photos, verify, assign) + BR-04 stock check / RFQ / offers / quotes: @Roles('PURCHASE'). */
+  purchaseWork: (r: Role) => r === 'PURCHASE',
 };
 
 export const ROLE_LABEL: Record<Role, string> = {

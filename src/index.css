@@ -8,9 +8,11 @@
   --color-bg-inverse: #1c1c1e; --color-bg-inverse-raised: #2c2c2f; --color-bg-disabled: #eeeef0;
   --color-text-primary: #111113; --color-text-secondary: #5a5a5f; --color-text-muted: #737378;
   --color-text-inverse: #ffffff; --color-text-inverse-muted: #bebec4; --color-text-disabled: #94949a;
+  --color-text-on-accent: #ffffff;
   --color-border-default: #dcdce0; --color-border-strong: #94949a; --color-border-focus: #1f5fd1; --color-border-inverse: #434347;
   --color-accent-fill: #c63e30; --color-accent-fill-hover: #a83327;
   --color-brand-logo: #da4a3c; --color-brand-subtle: #fdf0ee; --color-brand-text: #84271e; --color-brand-gear: #737378;
+  --color-brand-border: #c63e30;
   --color-warning-fill: #f5a300; --color-warning-bg: #fff8e6; --color-warning-fg: #7a4d00; --color-warning-border: #d98c00;
   --color-feedback-danger-fill: #b4234a; --color-feedback-success-fill: #1c7c4a;
   --color-status-neutral-bg: #eeeef0; --color-status-neutral-fg: #434347; --color-status-neutral-border: #bebec4;
@@ -18,9 +20,60 @@
   --color-status-success-bg: #e8f6ee; --color-status-success-fg: #0f5131; --color-status-success-border: #a9dfc0;
   --color-status-blocked-bg: #fcedf1; --color-status-blocked-fg: #7e1733; --color-status-blocked-border: #f2b8c7;
   --company-accent: #5b4bc4; --company-subtle: #f0eefc;
+
+  /* Desktop "glass" shell — Figma variables color/surface/glass, glass-strong, glass-border. */
+  --color-surface-glass: rgba(255, 255, 255, 0.62);
+  --color-surface-glass-strong: rgba(255, 255, 255, 0.86);
+  --color-surface-glass-border: rgba(255, 255, 255, 0.9);
+
+  /* Radius scale. --radius-sm and --radius-full are Figma variables; the others are the literal radii the
+     desktop frames draw, named so the kit shares them. */
+  --radius-sm: 4px;       /* status badge, priority flag */
+  --radius-md: 6px;       /* inline alert, gated-action reason, photo thumb */
+  --radius-lg: 10px;      /* photo drop zone */
+  --radius-field: 12px;   /* form field box, menu item */
+  --radius-chip: 18px;    /* choice chip, company indicator, filter menu, pagination page */
+  --radius-popover: 20px; /* table header row, notifications / user / search / row menu, toolbar fields */
+  --radius-pill: 22px;    /* nav pill, theme toggle, icon buttons */
+  --radius-card: 28px;    /* glass card, tab bar, table card, drawer */
+  --radius-toolbar: 30px;
+  --radius-nav: 36px;     /* top nav bar */
+  --radius-full: 999px;   /* buttons */
+
+  /* Brand-red gradient: active nav pill, current page, user avatar. */
+  --gradient-brand: linear-gradient(90deg, #ad3226 0%, #d04536 100%);
+  --shadow-glass: 0px 8px 24px 0px rgba(51, 38, 38, 0.06);
+  --shadow-menu: 0px 16px 40px 0px rgba(0, 0, 0, 0.45);   /* status / priority / date menus */
+  --shadow-popover: 0px 16px 40px 0px rgba(0, 0, 0, 0.5); /* row / notifications / user / search */
+  --shadow-pill-active: drop-shadow(0px 6px 8px rgba(173, 51, 38, 0.3));
+
+  /* Canvas behind every desktop frame: 4 radial washes over #efedec (the Figma frame fill, 1440×1024). */
+  --canvas-desktop:
+    radial-gradient(35% 35% at 100% 95%, rgba(191, 230, 220, 0.45) 0%, rgba(191, 230, 220, 0) 100%),
+    radial-gradient(45% 45% at 55% 105%, rgba(201, 194, 242, 0.5) 0%, rgba(201, 194, 242, 0) 100%),
+    radial-gradient(45% 45% at 0% 100%, rgba(231, 201, 190, 0.45) 0%, rgba(231, 201, 190, 0) 100%),
+    radial-gradient(42% 42% at 97% 0%, rgba(246, 185, 166, 0.55) 0%, rgba(246, 185, 166, 0) 100%),
+    linear-gradient(90deg, #efedec 0%, #efedec 100%);
 }
 :root[data-company="CHN"] { --company-accent: #0f7c7c; }
 
 html, body, #root { height: 100%; }
 body { @apply bg-canvas font-sans text-fg antialiased; }
 :focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: 2px; }
+
+@layer components {
+  /* Fixed to the viewport so the washes sit where Figma draws them while the page scrolls. */
+  .bg-desktop-canvas { background: var(--canvas-desktop); background-attachment: fixed; }
+  .glass {
+    background: var(--color-surface-glass); border: 1px solid var(--color-surface-glass-border);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  }
+  .glass-strong {
+    background: var(--color-surface-glass-strong); border: 1px solid var(--color-surface-glass-border);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+  }
+  /* Figma draws 2px focus / applied / error strokes INSIDE the box (no layout shift): 1px border + 1px inset ring. */
+  .ring-inside-brand { border-color: var(--color-brand-border) !important; box-shadow: inset 0 0 0 1px var(--color-brand-border); }
+  .ring-inside-danger { border-color: var(--color-feedback-danger-fill) !important; box-shadow: inset 0 0 0 1px var(--color-feedback-danger-fill); }
+  .pill-active-shadow { filter: var(--shadow-pill-active); }
+}

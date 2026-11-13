@@ -104,7 +104,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List items by status (ordered by item_code) */
+        /** List items by status (ordered by item_code), optionally searched */
         get: operations["MastersController_listItems"];
         put?: never;
         post: operations["MastersController_createItem"];
@@ -423,6 +423,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/my-jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The caller's jobs: current engineer assignment is the caller (incl. PENDING custody)
+         * @description Ordered CRITICAL -> URGENT -> NORMAL, then newest first. Max 500 rows.
+         */
+        get: operations["Br02Controller_myJobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/{id}": {
         parameters: {
             query?: never;
@@ -577,7 +597,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Inspection report with all versions */
+        /** Inspection report with all versions and Purchase's review decisions/comments */
         get: operations["Br03Controller_getReportByJob"];
         put?: never;
         post?: never;
@@ -594,7 +614,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Photos/videos recorded on an inspection report (all versions), oldest first */
+        get: operations["Br03Controller_listMedia"];
         put?: never;
         post: operations["Br03Controller_addMedia"];
         delete?: never;
@@ -677,6 +698,26 @@ export interface paths {
         };
         /** Material request with lines and change requests */
         get: operations["Br03Controller_getMaterialRequest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/material-requests/{id}/catalogue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Parts that can be added to this request: APPROVED + active catalogue-bridge rows with their item_bridge_id
+         * @description Same rule the line trigger applies. Rows are ordered by bridge item_code; use `search` to narrow. Since migration 023 the bridge is synced from the Item Master: an APPROVED or ACTIVE item is listed, DRAFT/UNDER_REVIEW/ON_HOLD/INACTIVE/SUPERSEDED items are not, and quantities are whole numbers only (CLIENT-UNCONFIRMED rules). There is no "request a new item" workflow: when a part is missing, the client should tell the engineer to ask Purchase to add it to the Item Master; it appears here once approved.
+         */
+        get: operations["Br03Controller_catalogue"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3262,6 +3303,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload one file (photo / video / PDF); returns the file_uri to attach to a record
+         * @description multipart/form-data with a single field "file". Allowed types: image/jpeg, image/png, image/webp, image/heic, image/heif, video/mp4, video/quicktime, application/pdf. The declared type must match the file content. Size limit: UPLOAD_MAX_BYTES (default 25 MB). Any authenticated role; the file is filed under the caller's company.
+         */
+        post: operations["UploadsController_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/uploads/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download an uploaded file's bytes (caller's company only) */
+        get: operations["UploadsController_download"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3898,6 +3976,49 @@ export interface components {
             response_reason: string | null;
             reassignment_reason: string | null;
         };
+        MyJobRow: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            company_id: string;
+            /** Format: uuid */
+            inward_id: string;
+            /** Format: uuid */
+            unit_id: string;
+            job_number: string;
+            /** @enum {string} */
+            status: "JOB_CREATED" | "AWAITING_ASSIGNMENT" | "ASSIGNED" | "ACCEPTED" | "INSPECTION" | "ON_HOLD" | "CANCELLED" | "CLOSED";
+            /** @enum {string} */
+            priority: "NORMAL" | "URGENT" | "CRITICAL";
+            /** @enum {string} */
+            route: "IN_HOUSE" | "EXTERNAL" | "ONSITE_LINKED";
+            /** Format: date-time */
+            released_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            closed_at: string | null;
+            /** Format: date-time */
+            cancelled_at: string | null;
+            cancel_reason: string | null;
+            /** @description The caller's current assignment on this job */
+            current_assignment: components["schemas"]["JobAssignmentsRow"];
+            jin_number: string;
+            /** @description Unit number within its equipment group */
+            unit_number: number;
+            /** @description Number of units in that equipment group */
+            units_in_group: number;
+            serial_number: string | null;
+            observed_make: string | null;
+            observed_model: string | null;
+            /**
+             * Format: uuid
+             * @description assemblies.id (customer equipment master)
+             */
+            assembly_id: string;
+            assembly_code: string;
+            assembly_name: string;
+        };
         JobDetail: {
             /** Format: uuid */
             id: string;
@@ -4056,6 +4177,19 @@ export interface components {
             /** @enum {string} */
             version_status: "SUBMITTED" | "ACCEPTED" | "RETURNED" | "SUPERSEDED";
         };
+        Br03InspectionReviewsRow: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            version_id: string;
+            /** Format: uuid */
+            reviewer_id: string;
+            /** @enum {string} */
+            review_decision: "ACCEPT" | "RETURN";
+            review_comment: string | null;
+            /** Format: date-time */
+            reviewed_at: string;
+        };
         InspectionReportDetail: {
             /** Format: uuid */
             id: string;
@@ -4075,13 +4209,8 @@ export interface components {
             updated_at: string;
             /** @description Ordered by version_no */
             versions: components["schemas"]["Br03InspectionReportVersionsRow"][];
-        };
-        AddInspectionMediaDto: {
-            /** @enum {string} */
-            media_type: "PHOTO" | "VIDEO";
-            file_uri: string;
-            file_name: string;
-            customer_visible?: boolean;
+            /** @description Purchase ACCEPT/RETURN decisions on this report's versions, ordered by reviewed_at (G13). review_comment is always present on a RETURN. */
+            reviews: components["schemas"]["Br03InspectionReviewsRow"][];
         };
         Br03InspectionMediaRow: {
             /** Format: uuid */
@@ -4101,6 +4230,13 @@ export interface components {
             /** Format: date-time */
             uploaded_at: string;
             customer_visible: boolean;
+        };
+        AddInspectionMediaDto: {
+            /** @enum {string} */
+            media_type: "PHOTO" | "VIDEO";
+            file_uri: string;
+            file_name: string;
+            customer_visible?: boolean;
         };
         SubmitInspectionVersionDto: {
             inspection_description: string;
@@ -4241,6 +4377,29 @@ export interface components {
             created_at: string;
             lines: components["schemas"]["Br03MaterialRequestLinesRow"][];
             change_requests: components["schemas"]["Br03MaterialChangeRequestsRow"][];
+        };
+        CatalogueItem: {
+            /**
+             * Format: uuid
+             * @description Send this as item_bridge_id when adding a line
+             */
+            item_bridge_id: string;
+            /** Format: uuid */
+            br01_item_id: string;
+            /** @description Bridge item code */
+            item_code: string;
+            /** @description Bridge item name */
+            item_name: string;
+            /** @description UOM the line will snapshot */
+            uom: string;
+            allows_fraction: boolean;
+            /** @description Decimal places a quantity may carry (0 = whole numbers) */
+            qty_precision: number;
+            /** @description fdn_item_master.item_code; null if the bridge points at no master row */
+            master_item_code: string | null;
+            master_standard_name: string | null;
+            /** @enum {string|null} */
+            master_status: "DRAFT" | "UNDER_REVIEW" | "APPROVED" | "ACTIVE" | "ON_HOLD" | "INACTIVE" | "SUPERSEDED" | null;
         };
         AddMaterialLineDto: {
             item_bridge_id: string;
@@ -9138,6 +9297,32 @@ export interface components {
         CloseOrderDto: {
             closure_reason: string;
         };
+        UploadResult: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            company_id: string;
+            /** Format: uuid */
+            uploaded_by_id: string;
+            /** @description Original file name (path and control characters removed) */
+            original_name: string;
+            /** @enum {string} */
+            content_type: "image/jpeg" | "image/png" | "image/webp" | "image/heic" | "image/heif" | "video/mp4" | "video/quicktime" | "application/pdf";
+            /**
+             * @description bigint, returned as string
+             * @example 183422
+             */
+            size_bytes: string;
+            /** @description SHA-256 of the stored bytes (hex) */
+            sha256: string;
+            /** Format: date-time */
+            created_at: string;
+            /**
+             * @description Pass this as `file_uri` to the media/photo endpoints. GET it (with the bearer token) to read the bytes.
+             * @example /api/uploads/0b9f…
+             */
+            file_uri: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -9365,6 +9550,8 @@ export interface operations {
             query?: {
                 /** @description Defaults to ACTIVE. Max 50 rows. */
                 status?: "DRAFT" | "UNDER_REVIEW" | "APPROVED" | "ACTIVE" | "ON_HOLD" | "INACTIVE" | "SUPERSEDED";
+                /** @description Case-insensitive substring of item_code, standard_name or short_description (max 100 chars) */
+                search?: string;
             };
             header?: never;
             path?: never;
@@ -10590,6 +10777,64 @@ export interface operations {
             };
         };
     };
+    Br02Controller_myJobs: {
+        parameters: {
+            query?: {
+                /** @description Only jobs in this service_jobs.status (default: all) */
+                status?: "JOB_CREATED" | "AWAITING_ASSIGNMENT" | "ASSIGNED" | "ACCEPTED" | "INSPECTION" | "ON_HOLD" | "CANCELLED" | "CLOSED";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyJobRow"][];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: ENGINEER */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     Br02Controller_getJob: {
         parameters: {
             query?: never;
@@ -11206,6 +11451,54 @@ export interface operations {
             };
         };
     };
+    Br03Controller_listMedia: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Br03InspectionMediaRow"][];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     Br03Controller_addMedia: {
         parameters: {
             query?: never;
@@ -11515,6 +11808,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MaterialRequestDetail"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Br03Controller_catalogue: {
+        parameters: {
+            query?: {
+                /** @description Case-insensitive match on item code or name (bridge and Item Master). Max 100 chars. */
+                search?: string;
+                /** @description Max rows, 1-200 (default 50) */
+                limit?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogueItem"][];
                 };
             };
             /** @description Validation or business-rule failure (including a malformed :id) */
@@ -21604,6 +21950,126 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    UploadsController_upload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadResult"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description File larger than UPLOAD_MAX_BYTES */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    UploadsController_download: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file, with its stored Content-Type */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Upload belongs to another company */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
             };
         };
     };

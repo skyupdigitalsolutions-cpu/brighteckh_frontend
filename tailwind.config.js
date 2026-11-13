@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 // Colours are the Figma "Direction A x Brightech" tokens (00 · Foundations), exposed as CSS vars in src/index.css.
+// Radius keys are prefixed `t-` so Tailwind's default rounded-sm/md/lg (used by the engineer screens) keep their values.
 const v = (n) => `var(--${n})`;
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
@@ -12,11 +13,13 @@ export default {
       colors: {
         canvas: v('color-bg-canvas'), surface: v('color-bg-surface'), subtle: v('color-bg-subtle'),
         inverse: v('color-bg-inverse'), 'inverse-raised': v('color-bg-inverse-raised'), disabled: v('color-bg-disabled'),
+        glass: { DEFAULT: v('color-surface-glass'), strong: v('color-surface-glass-strong'), border: v('color-surface-glass-border') },
         fg: { DEFAULT: v('color-text-primary'), 2: v('color-text-secondary'), muted: v('color-text-muted'),
-              inverse: v('color-text-inverse'), 'inverse-muted': v('color-text-inverse-muted'), disabled: v('color-text-disabled') },
+              inverse: v('color-text-inverse'), 'inverse-muted': v('color-text-inverse-muted'), disabled: v('color-text-disabled'),
+              'on-accent': v('color-text-on-accent') },
         line: { DEFAULT: v('color-border-default'), strong: v('color-border-strong'), focus: v('color-border-focus'), inverse: v('color-border-inverse') },
         accent: { DEFAULT: v('color-accent-fill'), hover: v('color-accent-fill-hover') },
-        brand: { logo: v('color-brand-logo'), subtle: v('color-brand-subtle'), text: v('color-brand-text'), gear: v('color-brand-gear') },
+        brand: { logo: v('color-brand-logo'), subtle: v('color-brand-subtle'), text: v('color-brand-text'), gear: v('color-brand-gear'), border: v('color-brand-border') },
         warn: { fill: v('color-warning-fill'), bg: v('color-warning-bg'), fg: v('color-warning-fg'), border: v('color-warning-border') },
         danger: v('color-feedback-danger-fill'), success: v('color-feedback-success-fill'),
         st: {
@@ -27,6 +30,13 @@ export default {
         },
         company: { accent: v('company-accent'), subtle: v('company-subtle') },
       },
+      borderRadius: {
+        't-sm': v('radius-sm'), 't-md': v('radius-md'), 't-lg': v('radius-lg'), 't-field': v('radius-field'),
+        't-chip': v('radius-chip'), 't-popover': v('radius-popover'), 't-pill': v('radius-pill'), 't-card': v('radius-card'),
+        't-toolbar': v('radius-toolbar'), 't-nav': v('radius-nav'), 't-full': v('radius-full'),
+      },
+      backgroundImage: { 'brand-gradient': v('gradient-brand') },
+      boxShadow: { glass: v('shadow-glass'), menu: v('shadow-menu'), popover: v('shadow-popover') },
     },
   },
   plugins: [],
