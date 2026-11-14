@@ -14,7 +14,9 @@ export function paginate<T>(rows: T[], page: number, pageSize: number) {
 
 export function Pagination({ page, pages, onChange, className }: { page: number; pages: number; onChange: (p: number) => void; className?: string }) {
   if (pages <= 1) return null;
-  const nav = 'flex h-[36px] w-[36px] shrink-0 items-center justify-center overflow-clip rounded-t-chip border border-line bg-glass-strong text-fg disabled:opacity-40';
+  // Figma draws Prev on page 1 (177:102936) and Next on the last page (177:108242) at full strength — inert, not
+  // dimmed — so disabled only drops the pointer.
+  const nav = 'flex h-[36px] w-[36px] shrink-0 items-center justify-center overflow-clip rounded-t-chip border border-line bg-glass-strong text-fg disabled:cursor-default';
   return (
     <nav aria-label="Pagination" className={cx('glass flex w-fit items-center gap-[6px] rounded-[24px] p-[6px]', className)}>
       <button type="button" aria-label="Previous page" className={nav} disabled={page <= 1} onClick={() => onChange(page - 1)}>

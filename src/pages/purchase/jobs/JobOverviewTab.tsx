@@ -82,7 +82,7 @@ export function JobOverviewTab() {
       </section>
 
       {/* Columns 177:116137 */}
-      <div className="flex w-full items-stretch gap-[20px]">
+      <div className="flex min-h-px w-full flex-1 items-stretch gap-[20px]">
         <div className="flex min-w-px flex-1 flex-col items-start gap-[20px]">
           <UnitCard ws={ws} />
           <HistoryCard
@@ -304,11 +304,13 @@ function HistoryCard({ job, verifiedById, engineerName, report, reportQ, session
           <ErrorState title="Couldn't load the inspection history" body={errorBody(failed.error)} onRetry={() => failed.refetch()} retrying={failed.isFetching} />
         </div>
       ) : (
-        <ol className="flex w-full flex-col">
+        // Items are separate children of the card (gap 16, 177:116169…). Rail = 12 wide with clip content, so the
+        // dot's 3px ring only shows below the dot — the dot sits flush with the title's top, as drawn.
+        <ol className="flex w-full flex-col gap-[16px]">
           {ev.map((e, i) => (
             <li key={`${e.at}-${e.title}`} className="flex w-full items-start gap-[12px]">
-              <div className="flex shrink-0 flex-col items-center gap-[4px] self-stretch overflow-clip pt-[3px]">
-                <span className={cx('m-[3px] block h-[12px] w-[12px] shrink-0 rounded-full', DOT[e.tone])} aria-hidden />
+              <div className="flex w-[12px] shrink-0 flex-col items-center gap-[4px] self-stretch overflow-clip">
+                <span className={cx('block h-[12px] w-[12px] shrink-0 rounded-full', DOT[e.tone])} aria-hidden />
                 {i < ev.length - 1 && <span className="min-h-px w-[2px] flex-1 bg-line" aria-hidden />}
               </div>
               <div className="flex min-w-px flex-1 flex-col items-start gap-[2px] overflow-clip pb-[20px]">

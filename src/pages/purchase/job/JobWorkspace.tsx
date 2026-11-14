@@ -135,7 +135,8 @@ export function JobWorkspace() {
         meta={meta}
         team={engineerId && engineerName ? [{ name: engineerName, seed: engineerId }] : undefined}
       />
-      <PageContent>
+      {/* flex-1: Figma "Content" fills the frame (J1 177:116072), so a tab's stretching cards reach the bottom. */}
+      <PageContent className="flex-1">
         <Tabs jobId={jobId} />
         <Outlet context={ctx} />
       </PageContent>
