@@ -12,10 +12,16 @@
 //   `warn` = warning bg/fg (177:103574).
 // - MetaField: 12/16 label over value, gap 2 (D·P6 Meta 177:103684) or 3 (S1 Grid 177:121869), value 14/20 Medium
 //   or Data/ID mono.
-// - TimelineItem: Figma "Timeline item" 7:416 (dot asset 18px, 2px connector, body pb-20 gap 2).
+// - TimelineItem: Figma "Timeline item" 7:408 / 7:416 / 7:424 (tone dot asset 18px, 2px connector, body pb-20 gap 2).
+//   Items are separate children of their card, so the list that holds them uses the card gap (16 on S1 History).
 import type { ReactNode } from 'react';
 import { cx, Ic, type TablerIcon } from '../../../ui/desktop/Icon';
-import timelineDot from '../../../assets/figma/sourcing/timeline-dot.svg';
+import timelineDotProgress from '../../../assets/figma/sourcing/timeline-dot.svg';
+import timelineDotNeutral from '../../../assets/figma/sourcing/timeline-dot-neutral.svg';
+import timelineDotSuccess from '../../../assets/figma/sourcing/timeline-dot-success.svg';
+
+export type TimelineTone = 'neutral' | 'progress' | 'success';
+const TIMELINE_DOT: Record<TimelineTone, string> = { neutral: timelineDotNeutral, progress: timelineDotProgress, success: timelineDotSuccess };
 
 export function SectionCard({ children, className, pad = 20, fill }: { children: ReactNode; className?: string; pad?: 20 | 24; fill?: boolean }) {
   return (
@@ -121,12 +127,14 @@ export function MetaField({ label, children, mono, gap = 2 }: { label: string; c
   );
 }
 
-export function TimelineItem({ title, meta, detail, last }: { title: ReactNode; meta: ReactNode; detail?: ReactNode; last?: boolean }) {
+export function TimelineItem({ title, meta, detail, last, tone = 'progress' }: {
+  title: ReactNode; meta: ReactNode; detail?: ReactNode; last?: boolean; tone?: TimelineTone;
+}) {
   return (
     <div className="flex w-full items-start gap-[12px]">
       <div className="flex shrink-0 flex-col items-center gap-[4px] self-stretch overflow-clip">
         <div className="relative h-[12px] w-[12px] shrink-0">
-          <img alt="" src={timelineDot} className="absolute inset-[-25%] block h-[18px] w-[18px] max-w-none" />
+          <img alt="" src={TIMELINE_DOT[tone]} className="absolute inset-[-25%] block h-[18px] w-[18px] max-w-none" />
         </div>
         {!last && <div className="min-h-px w-[2px] flex-1 bg-line" />}
       </div>

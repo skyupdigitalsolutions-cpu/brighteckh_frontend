@@ -15,7 +15,7 @@
 // - No RFQ history endpoint (C2-3): History is built from the RFQ's own timestamps (created, sent, invites,
 //   offers, technical checks), without actor names.
 // - Offer rows: one per offer line of the selected RFQ line, ranked by `comparable_landed_cost` (DB value). Disc. is
-//   the ₹ amount `quoted_discount` (Figma "%"). The selected row is highlighted; a PENDING selected row shows
+//   the ₹ amount `quoted_discount` (Figma "%"), so its column is 84 wide instead of Figma's 48. The selected row is highlighted; a PENDING selected row shows
 //   Valid / Invalid (Purchase marks validity manually — CLAUDE.md §6). "Best valid" = lowest landed among COMPLIANT.
 // - All cost columns are gated on can.seeSupplierCost(role); writes on can.purchaseWork(role) (hidden otherwise).
 // - The RFQ status is never moved to COMPARED by the API (C2-5); it is shown as returned. Cancel RFQ: no endpoint (C2-4).
@@ -42,7 +42,7 @@ import {
   type OfferLine, type Rfq,
 } from '../api';
 import { shortId } from './data';
-import { CardHead, Cell, GridHead, GridRow, HCell, ItemTwo, MetaField, Muted, Num, SectionCard, TimelineItem, formatDayMonth } from './ui';
+import { CardHead, Cell, GridHead, GridRow, HCell, ItemTwo, MetaField, Muted, Num, SectionCard, TimelineItem, formatDayMonth, type TimelineTone } from './ui';
 import { InviteSupplierDrawer, MarkInvalidDrawer, RecordOfferDrawer } from './RfqDrawers';
 import { rfqLabel } from './RfqTable';
 
@@ -253,7 +253,8 @@ export function RfqDetailPage() {
           <div role="row" className="flex w-full items-start gap-[12px] overflow-clip rounded-[20px] bg-subtle px-[16px] py-[12px]">
             <HCell grow>Supplier</HCell><HCell w={320}>Contact</HCell><HCell w={140}>Invited</HCell><HCell w={150}>Status</HCell><HCell w={90}>Offers</HCell>
           </div>
-          <div className="flex w-full flex-col">
+          {/* Rows are card children in Figma (177:121923…): 16 apart, like header → first row. */}
+          <div className="flex w-full flex-col gap-[16px]">
             {rfq.invites.map((i) => {
               const n = rfq.offers.filter((o) => o.supplier_invite_id === i.id).length;
               return (
@@ -350,7 +351,8 @@ export function RfqDetailPage() {
               <HCell w={80}>Valid until</HCell>
               <HCell w={200}>Technical</HCell>
             </GridHead>
-            <div className="flex w-full flex-col">
+            {/* Rows are card children in Figma (177:103732…): 14 apart, like header → first row. */}
+            <div className="flex w-full flex-col gap-[14px]">
               {rows.map((r) => {
                 const l = r.line;
                 const isSel = l.id === sel;
@@ -394,19 +396,22 @@ export function RfqDetailPage() {
     </>
   );
 
-  type Ev = { at: string; title: string; detail?: string };
-  const events: Ev[] = [{ at: rfq.created_at, title: `RFQ created · ${rfq.lines.length === 1 ? '1 line' : `${rfq.lines.length} lines`}` }];
-  if (rfq.sent_at) events.push({ at: rfq.sent_at, title: 'RFQ sent' });
-  for (const i of rfq.invites) events.push({ at: i.created_at, title: `Supplier invited · ${i.supplier_name_snapshot}` });
+  // Dot tones as drawn on S1 History (177:122113): created / invited = neutral, offer recorded = progress, marked
+  // compliant = success. Non-compliant has no drawn variant (the component has no blocked tone) → neutral.
+  type Ev = { at: string; title: string; detail?: string; tone: TimelineTone };
+  const events: Ev[] = [{ at: rfq.created_at, title: `RFQ created · ${rfq.lines.length === 1 ? '1 line' : `${rfq.lines.length} lines`}`, tone: 'neutral' }];
+  if (rfq.sent_at) events.push({ at: rfq.sent_at, title: 'RFQ sent', tone: 'neutral' });
+  for (const i of rfq.invites) events.push({ at: i.created_at, title: `Supplier invited · ${i.supplier_name_snapshot}`, tone: 'neutral' });
   for (const o of rfq.offers) {
     const s = rfq.invites.find((i) => i.id === o.supplier_invite_id)?.supplier_name_snapshot ?? 'Supplier';
-    events.push({ at: o.created_at, title: `Offer recorded · ${s}${o.version_no > 1 ? ` (v${o.version_no})` : ''}` });
+    events.push({ at: o.created_at, title: `Offer recorded · ${s}${o.version_no > 1 ? ` (v${o.version_no})` : ''}`, tone: 'progress' });
     for (const l of o.lines) {
       if (l.technical_checked_at && l.technical_status !== 'PENDING') {
         events.push({
           at: l.technical_checked_at,
           title: `${l.technical_status === 'COMPLIANT' ? 'Marked compliant' : 'Marked non-compliant'} · ${s} ${makePart(l)}`,
           detail: l.technical_reason ?? undefined,
+          tone: l.technical_status === 'COMPLIANT' ? 'success' : 'neutral',
         });
       }
     }
@@ -416,8 +421,8 @@ export function RfqDetailPage() {
   const historyTab = (
     <SectionCard pad={24} fill>
       <CardHead title="History" />
-      <div className="flex w-full flex-col">
-        {events.map((e, i) => <TimelineItem key={`${e.at}-${i}`} title={e.title} meta={formatDayTime(e.at)} detail={e.detail} last={i === events.length - 1} />)}
+      <div className="flex w-full flex-col gap-[16px]">
+        {events.map((e, i) => <TimelineItem key={`${e.at}-${i}`} title={e.title} meta={formatDayTime(e.at)} detail={e.detail} tone={e.tone} last={i === events.length - 1} />)}
       </div>
       <GapNote code="C2-3">RFQ history has no actor names: there is no RFQ history endpoint, so this timeline is rebuilt from the RFQ's own timestamps.</GapNote>
     </SectionCard>

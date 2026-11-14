@@ -17,8 +17,10 @@
 //   py-12, gap 16: Unit price · Landed · Delivery, 12/16 label over Data/ID) + Reason * (helper "Required. Saved with
 //   the offer line and shown in comparisons."). POST /offer-lines/{id}/mark-validity {valid:false, reason}.
 import { useEffect, useState } from 'react';
+import { IconCheck, IconSend, IconX } from '@tabler/icons-react';
 import { Drawer } from '../../../ui/desktop/Drawer';
 import { Button } from '../../../ui/desktop/Button';
+import { Ic } from '../../../ui/desktop/Icon';
 import { ChoiceChips, DateField, FieldRow, NumberInput, SelectField, TextInput } from '../../../ui/desktop/Fields';
 import { FormErrors, InlineAlert } from '../../../ui/desktop/Feedback';
 import { formatINR, formatQty } from '../../../lib/format';
@@ -44,6 +46,7 @@ export function InviteSupplierDrawer({ open, onClose, rfq, subtitle, jobId, onDo
       open={open}
       onClose={onClose}
       busy={m.isPending}
+      bodyGap={16}
       title="Invite supplier"
       subtitle={subtitle}
       onSubmit={() => {
@@ -57,7 +60,7 @@ export function InviteSupplierDrawer({ open, onClose, rfq, subtitle, jobId, onDo
       footer={(
         <>
           <Button kind="secondary" onClick={onClose} disabled={m.isPending}>Cancel</Button>
-          <Button kind="primary" type="submit" busy={m.isPending}>Send invite</Button>
+          <Button kind="primary" type="submit" busy={m.isPending} icon={<Ic icon={IconSend} size={18} />}>Send invite</Button>
         </>
       )}
     >
@@ -165,13 +168,14 @@ export function RecordOfferDrawer({ open, onClose, rfq, jobId, preselectInvite, 
       open={open}
       onClose={onClose}
       busy={m.isPending}
+      bodyGap={16}
       title="Record supplier offer"
       subtitle={sub}
       onSubmit={submit}
       footer={(
         <>
           <Button kind="secondary" onClick={onClose} disabled={m.isPending}>Cancel</Button>
-          <Button kind="primary" type="submit" busy={m.isPending}>Save offer</Button>
+          <Button kind="primary" type="submit" busy={m.isPending} icon={<Ic icon={IconCheck} size={18} />}>Save offer</Button>
         </>
       )}
     >
@@ -191,15 +195,15 @@ export function RecordOfferDrawer({ open, onClose, rfq, jobId, preselectInvite, 
         const er = tried ? lineErrors(rl.id, qty) : null;
         const preview = landedPreview(qty, l);
         return (
-          <div key={rl.id} className="flex w-full flex-col gap-[18px]">
+          <div key={rl.id} className="flex w-full flex-col gap-[16px]">
             {!one && (
               <p className="text-[14px] font-semibold leading-[20px] text-fg">
                 Line {rl.line_no} · {rl.item_name ?? `Item ${shortId(rl.item_bridge_id)}`} · {formatQty(rl.quantity, rl.uom)}
               </p>
             )}
-            <FieldRow>
+            <FieldRow gap={12}>
               <TextInput label="Make" value={l.make} onChange={(e) => set(rl.id, { make: e.target.value })} />
-              <TextInput label="Part number" mono value={l.part} onChange={(e) => set(rl.id, { part: e.target.value })} />
+              <TextInput label="Part number" value={l.part} onChange={(e) => set(rl.id, { part: e.target.value })} />
             </FieldRow>
             <ChoiceChips<Cond>
               label="Condition *"
@@ -207,16 +211,16 @@ export function RecordOfferDrawer({ open, onClose, rfq, jobId, preselectInvite, 
               options={[{ value: 'NEW', label: 'NEW' }, { value: 'REFURBISHED', label: 'REFURBISHED' }, { value: 'OTHER', label: 'OTHER' }]}
               onChange={(v) => set(rl.id, { cond: v })}
             />
-            <FieldRow>
-              <NumberInput label="Unit price (₹) *" value={l.price} onChange={(e) => set(rl.id, { price: e.target.value })} error={er?.price} />
-              <NumberInput label="Discount (₹)" value={l.disc} placeholder="0" onChange={(e) => set(rl.id, { disc: e.target.value })} error={er?.disc} />
+            <FieldRow gap={12}>
+              <NumberInput mono="number" label="Unit price (₹) *" value={l.price} onChange={(e) => set(rl.id, { price: e.target.value })} error={er?.price} />
+              <NumberInput mono="number" label="Discount (₹)" value={l.disc} placeholder="0" onChange={(e) => set(rl.id, { disc: e.target.value })} error={er?.disc} />
             </FieldRow>
-            <FieldRow>
-              <NumberInput label="Freight / packing (₹)" value={l.freight} placeholder="0.00" onChange={(e) => set(rl.id, { freight: e.target.value })} error={er?.freight} />
-              <NumberInput label="Non-recoverable tax (₹)" value={l.nrtax} placeholder="0.00" onChange={(e) => set(rl.id, { nrtax: e.target.value })} error={er?.nrtax} />
+            <FieldRow gap={12}>
+              <NumberInput mono="number" label="Freight / packing (₹)" value={l.freight} placeholder="0.00" onChange={(e) => set(rl.id, { freight: e.target.value })} error={er?.freight} />
+              <NumberInput mono="number" label="Non-recoverable tax (₹)" value={l.nrtax} placeholder="0.00" onChange={(e) => set(rl.id, { nrtax: e.target.value })} error={er?.nrtax} />
             </FieldRow>
-            <FieldRow>
-              <NumberInput label="Delivery (days)" inputMode="numeric" value={l.days} onChange={(e) => set(rl.id, { days: e.target.value })} error={er?.days} />
+            <FieldRow gap={12}>
+              <NumberInput mono="number" label="Delivery (days)" inputMode="numeric" value={l.days} onChange={(e) => set(rl.id, { days: e.target.value })} error={er?.days} />
               {one
                 ? <DateField label="Valid until" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
                 : <div />}
@@ -258,6 +262,7 @@ export function MarkInvalidDrawer({ open, onClose, rfqId, jobId, line, title, on
       open={open}
       onClose={onClose}
       busy={m.isPending}
+      bodyGap={16}
       title="Mark offer line invalid"
       subtitle={title}
       onSubmit={() => {
@@ -268,7 +273,7 @@ export function MarkInvalidDrawer({ open, onClose, rfqId, jobId, line, title, on
       footer={(
         <>
           <Button kind="secondary" onClick={onClose} disabled={m.isPending}>Cancel</Button>
-          <Button kind="primary" type="submit" busy={m.isPending}>Mark invalid</Button>
+          <Button kind="danger" type="submit" busy={m.isPending} icon={<Ic icon={IconX} size={18} />}>Mark invalid</Button>
         </>
       )}
     >

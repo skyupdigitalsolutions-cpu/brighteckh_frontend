@@ -3,7 +3,7 @@
 // viewport edges, surface fill, 1px glass border, radius 28.
 // Header: pt-28 px-28 pb-20, gap 12; title 22/28 SemiBold, subtitle 14/20 secondary (gap 4); close = 40px round
 // subtle button with 20px x (primary).
-// Body: px-28 pt-4 pb-20, gap 18, scrolls. Footer: 1px top border-default, pt-20 px-28 pb-28, gap 12; buttons
+// Body: px-28 pt-4 pb-20, gap 18 (`bodyGap` 16 = the S1 RFQ drawers 177:122021 / 122262 / 122743), scrolls. Footer: 1px top border-default, pt-20 px-28 pb-28, gap 12; buttons
 // flex-1 (e.g. Cancel secondary + primary action).
 //
 // variant="side" — the 480-wide drawer of D·P2a 177:103185 / D·P2b 177:103290 (assign engineer etc.): no border,
@@ -16,7 +16,7 @@ import { IconX } from '@tabler/icons-react';
 import { cx, Ic } from './Icon';
 import { Scrim, useDismiss } from './Popover';
 
-export function Drawer({ open, onClose, title, subtitle, children, footer, onSubmit, width, busy, variant = 'default' }: {
+export function Drawer({ open, onClose, title, subtitle, children, footer, onSubmit, width, busy, variant = 'default', bodyGap = 18 }: {
   open: boolean;
   onClose: () => void;
   title: ReactNode;
@@ -30,6 +30,8 @@ export function Drawer({ open, onClose, title, subtitle, children, footer, onSub
   busy?: boolean;
   /** 'default' = 520 P1 drawer (177:108447); 'side' = 480 P2a/P2b drawer (177:103185 / 177:103290). */
   variant?: 'default' | 'side';
+  /** Body gap for the default variant: 18 (P1 177:108447) or 16 (S1 RFQ drawers). */
+  bodyGap?: 16 | 18;
 }) {
   const side = variant === 'side';
   const w = width ?? (side ? 480 : 520);
@@ -62,7 +64,7 @@ export function Drawer({ open, onClose, title, subtitle, children, footer, onSub
       <div
         className={cx(
           'flex min-h-0 w-full flex-1 flex-col overflow-y-auto',
-          side ? 'items-stretch gap-[16px] px-[24px] pb-[16px] pt-[8px]' : 'gap-[18px] px-[28px] pb-[20px] pt-[4px]',
+          side ? 'items-stretch gap-[16px] px-[24px] pb-[16px] pt-[8px]' : cx(bodyGap === 16 ? 'gap-[16px]' : 'gap-[18px]', 'px-[28px] pb-[20px] pt-[4px]'),
         )}
       >
         {children}

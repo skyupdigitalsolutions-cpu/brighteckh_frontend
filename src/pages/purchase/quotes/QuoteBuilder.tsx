@@ -83,8 +83,9 @@ function SumRow({ label, value, strong, tone }: { label: ReactNode; value: React
 }
 function LockChip({ children, width = 120 }: { children: ReactNode; width?: number }) {
   return (
+    // 177:117451: lock (muted) sits at the top padding, level with the text top — not centred on the 20px line.
     <div className="flex shrink-0 items-start justify-end gap-[6px] overflow-clip rounded-[10px] bg-subtle px-[10px] py-[6px]" style={{ width }}>
-      <span className="flex h-[20px] items-center"><Ic icon={IconLock} size={14} className="text-fg-2" /></span>
+      <Ic icon={IconLock} size={14} className="text-fg-muted" />
       <span className="whitespace-nowrap font-mono text-[14px] font-semibold leading-[20px] text-fg">{children}</span>
     </div>
   );
@@ -344,7 +345,8 @@ export function QuoteBuilder({ job, quote, responses, canWork, canSeeCost, start
             ))}
           </div>
 
-          <div className="flex w-full flex-col" role="rowgroup">
+          {/* Rows are card children in Figma (177:103835…): 14 apart, like header → first row. */}
+          <div className="flex w-full flex-col gap-[14px]" role="rowgroup">
             {view.map((l, i) => {
               const err = attempted && editable ? lineErr(l) : { desc: false, qty: false, uom: false, price: false };
               const newRow = editable && l.isNew;
@@ -416,7 +418,7 @@ export function QuoteBuilder({ job, quote, responses, canWork, canSeeCost, start
               <div className="flex w-full items-center gap-[10px] overflow-clip">
                 <h3 className="min-w-px flex-1 text-[18px] font-semibold leading-[24px] text-fg">Cost &amp; margin</h3>
                 <div className="flex shrink-0 items-center gap-[6px] overflow-clip rounded-[14px] bg-subtle py-[6px] pl-[10px] pr-[12px]">
-                  <Ic icon={IconLock} size={14} className="text-fg-2" />
+                  <Ic icon={IconLock} size={14} className="text-fg-muted" />
                   <span className="whitespace-nowrap text-[12px] leading-[16px] text-fg-2">Purchase only</span>
                 </div>
               </div>

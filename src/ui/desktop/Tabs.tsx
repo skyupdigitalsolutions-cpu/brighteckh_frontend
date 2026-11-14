@@ -2,8 +2,7 @@
 // Bar: glass, radius 28, px-24 py-6, gap 32; the register bar also has the glass shadow (`shadow`), the job
 // workspace bar does not. Tab: pt-8, gap 6, label 14/20 (active Medium primary, default Regular secondary),
 // 2px underline radius 1 (active = brand-logo).
-// Counts: no Figma frame draws a count; when `count` is given it is appended as " · n" in the same label style
-// (deviation, see report).
+// Counts: appended as " · n" in the label's own style (S1 RFQ tab bar 177:121859 "Suppliers · 3").
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
 import { cx } from './Icon';
@@ -24,7 +23,7 @@ function TabInner({ active, label, count }: { active: boolean; label: ReactNode;
     <>
       <span className={cx('whitespace-nowrap text-[14px] leading-[20px]', active ? 'font-medium text-fg' : 'font-normal text-fg-2')}>
         {label}
-        {count != null && <span className="font-mono"> · {count}</span>}
+        {count != null && <> · {count}</>}
       </span>
       <span className={cx('h-[2px] w-full rounded-[1px]', active && 'bg-brand-logo')} aria-hidden />
     </>

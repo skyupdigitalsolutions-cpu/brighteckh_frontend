@@ -6,7 +6,8 @@
 // Disabled = bg-disabled + text-disabled (4:408). Read-only/locked = bg-subtle + 1px border-default + 16px lock (4:413).
 // ChoiceChips: Channel / Priority option chips (177:108473): px-16 py-10, radius 18, 11/14 SemiBold +0.44;
 // selected = brand-subtle + 1px brand-border + primary text; other = bg-subtle + 1px border-default + secondary.
-// FieldRow: two fields side by side, gap 14 (177:108461).
+// FieldRow: two fields side by side, gap 14 (177:108461); `gap` 12 = S1 Record offer rows (177:122268).
+// `mono="number"` = Data/Number (14/20 mono Regular) values, as in the Record offer price / days boxes (177:122287).
 // PhotoPicker: Figma "Photo capture" desktop states 6:416 (empty) / 6:427 (uploading) / 6:447 (uploaded) / 6:475 (failed).
 import {
   forwardRef, useId, useRef, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes,
@@ -30,8 +31,8 @@ export function Field({ label, helper, error, children, htmlFor, className }: {
   );
 }
 
-export function FieldRow({ children }: { children: ReactNode }) {
-  return <div className="flex w-full items-start gap-[14px] [&>*]:min-w-px [&>*]:flex-1">{children}</div>;
+export function FieldRow({ children, gap = 14 }: { children: ReactNode; gap?: 12 | 14 }) {
+  return <div className={cx('flex w-full items-start [&>*]:min-w-px [&>*]:flex-1', gap === 12 ? 'gap-[12px]' : 'gap-[14px]')}>{children}</div>;
 }
 
 const boxBase = 'flex h-[44px] w-full items-center gap-[8px] overflow-clip rounded-t-field border px-[14px]';
@@ -42,12 +43,14 @@ export const boxState = (error?: boolean, disabled?: boolean) => cx(
   !disabled && 'focus-within:ring-inside-brand',
   error && 'ring-inside-danger',
 );
-const inputText = (mono?: boolean) => cx(
+const inputText = (mono?: boolean | 'number') => cx(
   'min-w-0 flex-1 bg-transparent placeholder:text-fg-muted focus:outline-none disabled:text-fg-disabled',
-  mono ? 'font-mono text-[13px] font-medium leading-[18px] text-fg' : 'text-[14px] leading-[20px] text-fg',
+  mono === 'number' ? 'font-mono text-[14px] leading-[20px] text-fg'
+    : mono ? 'font-mono text-[13px] font-medium leading-[18px] text-fg' : 'text-[14px] leading-[20px] text-fg',
 );
 
-type BaseProps = { label: ReactNode; helper?: ReactNode; error?: string | null; mono?: boolean; className?: string };
+/** mono: true = Data/ID (13/18 Medium); 'number' = Data/Number (14/20 Regular). */
+type BaseProps = { label: ReactNode; helper?: ReactNode; error?: string | null; mono?: boolean | 'number'; className?: string };
 
 // ---------------------------------------------------------------- Text / number
 export const TextInput = forwardRef<HTMLInputElement, BaseProps & InputHTMLAttributes<HTMLInputElement> & { trailing?: ReactNode }>(
