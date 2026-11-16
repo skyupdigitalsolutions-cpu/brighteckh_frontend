@@ -10,7 +10,8 @@ export type LineType = QuoteLineRow['line_type'];
 export type QuoteType = S<'Br04CustomerQuotesRow'>['quote_type'];
 export type QuoteStatus = S<'Br04CustomerQuoteRevisionsRow'>['quote_status'];
 export type RevisionWithLines = S<'QuoteRevisionWithLines'>;
-export type QuoteResponse = S<'Br05CustomerResponseEventsRow'>;
+/** GET /jobs/:id/quote-responses row. `quote_revision_id` is the BR-05 ref id; the BR-04 revision is `source_br04_quote_revision_id`. */
+export type QuoteResponse = S<'QuoteResponseEvent'>;
 export type OfferLine = S<'Br04SupplierOfferLinesRow'>;
 
 /** Line types, in the API enum's order. */

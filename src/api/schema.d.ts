@@ -1026,6 +1026,10 @@ export interface paths {
         /** Customer quote responses, newest first (+ the BR-04 quote revision each one refers to) */
         get: operations["Br05Controller_getQuoteResponses"];
         put?: never;
+        /**
+         * Record a customer response to a sent quote revision
+         * @description `br04_quote_revision_id` must be the LATEST revision of its quote, that revision must be SENT, and the caller must be the Sales employee it was released to. 400 for not-latest / not-sent, 403 for another Sales employee.
+         */
         post: operations["Br05Controller_recordQuoteResponse"];
         delete?: never;
         options?: never;
@@ -3592,6 +3596,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sales/quotes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sales quote worklist (G-S1): quotes whose LATEST revision was released to the caller
+         * @description Paginated: `page` (default 1), `page_size` (default 25, max 100) -> { rows, total, page, page_size, counts_by_stage }. Filters: `stage` (comma-separated derived SalesStage), `valid_until_before` (YYYY-MM-DD, strict), `search` (quote number, job number, customer name/code, serial, make, model). Company and assignee come from the token. A quote re-revised to DRAFT by Purchase drops out until it is released again. Customer-facing fields only.
+         */
+        get: operations["SalesDeskController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -5523,6 +5547,18 @@ export interface components {
              * @description br04_quote_sales_handoffs.released_at
              */
             released_to_sales_at: string | null;
+            /**
+             * Format: date-time
+             * @description changed_at of the BR04_QUOTE_SENT activity_audit_log row for this revision (entity_id = revision id); null until sent
+             */
+            sent_at: string | null;
+            /**
+             * Format: uuid
+             * @description actor_id of that BR04_QUOTE_SENT audit row (the Sales employee who sent it)
+             */
+            sent_by_id: string | null;
+            /** @description employees.full_name of sent_by_id */
+            sent_by_name: string | null;
         };
         QuoteDetail: {
             /** Format: uuid */
@@ -10358,6 +10394,124 @@ export interface components {
             intake_this_week: components["schemas"]["OverviewIntakeDay"][];
             /** @description Latest 10 activity_audit_log rows of the company. before/after state is NOT returned. */
             latest_activity: components["schemas"]["OverviewActivity"][];
+        };
+        SalesQuoteLatestResponse: {
+            /**
+             * Format: uuid
+             * @description br05_customer_response_events.id
+             */
+            response_id: string;
+            /** @enum {string} */
+            response_type: "AWAITING_RESPONSE" | "ACCEPTED" | "COUNTER_OFFER" | "TECHNICAL_QUERY" | "PARTIAL_ACCEPTANCE" | "ON_HOLD" | "REJECTED" | "EXPIRED";
+            /** @enum {string|null} */
+            response_channel: "EMAIL" | "WHATSAPP" | "CALL" | "IN_PERSON" | "OTHER" | null;
+            /** @description br05_customer_response_events.customer_contact (free text, the customer person contacted) */
+            customer_contact: string | null;
+            /** Format: date-time */
+            responded_at: string;
+            /** Format: uuid */
+            recorded_by_id: string;
+            /** @description employees.full_name of recorded_by_id */
+            recorded_by_name: string;
+        };
+        SalesQuoteRow: {
+            /**
+             * Format: uuid
+             * @description br04_customer_quotes.id (GET /quotes/:id, POST /quotes/:id/send)
+             */
+            quote_id: string;
+            quote_number: string;
+            /** @enum {string} */
+            quote_type: "ITEM" | "ASSEMBLED";
+            /** Format: uuid */
+            job_id: string;
+            job_number: string;
+            /** Format: uuid */
+            customer_id: string;
+            customer_name: string;
+            customer_code: string;
+            serial_number: string | null;
+            observed_make: string | null;
+            observed_model: string | null;
+            /** @description assemblies.assembly_name of the unit's equipment group (shared assemblies table) */
+            assembly_name: string | null;
+            /**
+             * Format: uuid
+             * @description BR-04 br04_customer_quote_revisions.id of the LATEST revision (POST /jobs/:id/quote-responses takes this)
+             */
+            latest_revision_id: string;
+            /** @description 0-based, as stored */
+            revision_no: number;
+            /**
+             * @description BR-04 quote_status of the latest revision
+             * @enum {string}
+             */
+            quote_status: "RELEASED_TO_SALES" | "SENT" | "ACCEPTED" | "REJECTED" | "EXPIRED";
+            /** Format: date */
+            valid_until: string | null;
+            /**
+             * Format: decimal
+             * @description Latest revision revised_pre_tax (customer price, rupees numeric)
+             */
+            revised_pre_tax: string | null;
+            /** Format: decimal */
+            tax_total: string | null;
+            /** Format: decimal */
+            freight_charge: string | null;
+            /**
+             * Format: uuid
+             * @description br04_quote_sales_handoffs.assigned_sales_id (always the caller)
+             */
+            assigned_sales_id: string;
+            /**
+             * Format: date-time
+             * @description br04_quote_sales_handoffs.released_at
+             */
+            released_to_sales_at: string;
+            /**
+             * Format: uuid
+             * @description br04_quote_sales_handoffs.released_by_purchase_id
+             */
+            released_by_id: string;
+            /** @description employees.full_name of released_by_id */
+            released_by_name: string;
+            /**
+             * Format: date-time
+             * @description changed_at of the BR04_QUOTE_SENT activity_audit_log row for the latest revision; null if not sent
+             */
+            sent_at: string | null;
+            /**
+             * Format: uuid
+             * @description actor_id of that audit row
+             */
+            sent_by_id: string | null;
+            /** @description employees.full_name of sent_by_id */
+            sent_by_name: string | null;
+            /** @description Newest br05_customer_response_events row recorded against the latest BR-04 revision (via br05_quote_revision_refs.source_br04_quote_id); null if none */
+            latest_response: components["schemas"]["SalesQuoteLatestResponse"] | null;
+            /**
+             * @description TO_SEND = latest revision RELEASED_TO_SALES. AWAITING = latest revision SENT and no BR-05 response for it yet, or its latest response is AWAITING_RESPONSE. IN_DISCUSSION = SENT and latest response COUNTER_OFFER / TECHNICAL_QUERY / PARTIAL_ACCEPTANCE / ON_HOLD. ACCEPTED / REJECTED / EXPIRED = SENT and latest response of that type, or the BR-04 revision itself has that quote_status (unreachable today: no API sets those and the DB refuses any update of a SENT revision; the BR-04 status would win over responses).
+             * @enum {string}
+             */
+            sales_stage: "TO_SEND" | "AWAITING" | "IN_DISCUSSION" | "ACCEPTED" | "REJECTED" | "EXPIRED";
+        };
+        SalesStageCounts: {
+            TO_SEND: number;
+            AWAITING: number;
+            IN_DISCUSSION: number;
+            ACCEPTED: number;
+            REJECTED: number;
+            EXPIRED: number;
+        };
+        SalesQuoteListPage: {
+            /** @description Rows matching the filters (all pages) */
+            total: number;
+            page: number;
+            page_size: number;
+            /** @description TO_SEND first by released_to_sales_at ascending (oldest waiting first); then the rest by the latest of sent_at / latest_response.responded_at descending; quote_number breaks ties. */
+            rows: components["schemas"]["SalesQuoteRow"][];
+            /** @description Per-stage totals for the caller's scope under the current `search` only (ignores `stage` and `valid_until_before`). Every stage is present (0 when empty). */
+            counts_by_stage: components["schemas"]["SalesStageCounts"];
         };
     };
     responses: never;
@@ -23998,6 +24152,70 @@ export interface operations {
             };
             /** @description Requires role: PURCHASE | MANAGEMENT */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    SalesDeskController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Case-insensitive substring match (see each endpoint for the fields searched) */
+                search?: string;
+                /** @description Derived sales stage (comma-separated; one or more of TO_SEND, AWAITING, IN_DISCUSSION, ACCEPTED, REJECTED, EXPIRED). Omitted = all. TO_SEND = latest revision RELEASED_TO_SALES. AWAITING = latest revision SENT and no BR-05 response for it yet, or its latest response is AWAITING_RESPONSE. IN_DISCUSSION = SENT and latest response COUNTER_OFFER / TECHNICAL_QUERY / PARTIAL_ACCEPTANCE / ON_HOLD. ACCEPTED / REJECTED / EXPIRED = SENT and latest response of that type, or the BR-04 revision itself has that quote_status (unreachable today: no API sets those and the DB refuses any update of a SENT revision; the BR-04 status would win over responses). */
+                stage?: "TO_SEND" | "AWAITING" | "IN_DISCUSSION" | "ACCEPTED" | "REJECTED" | "EXPIRED";
+                /** @description Only quotes whose latest revision valid_until is strictly before this date (YYYY-MM-DD). Quotes with no valid_until are excluded when this is set. */
+                valid_until_before?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SalesQuoteListPage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: SALES */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

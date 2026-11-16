@@ -21,6 +21,7 @@ import { SourcingRoutes } from './pages/purchase/sourcing/routes';
 import { RfqRoutes } from './pages/purchase/sourcing/rfq-routes';
 import { JobQuoteTab } from './pages/purchase/quotes/JobQuoteTab';
 import { QuotesRoutes } from './pages/purchase/quotes/routes';
+import { SalesRoutes } from './pages/sales/routes';
 import { MyJobsPage } from './pages/engineer/MyJobsPage';
 import { JobDetailPage } from './pages/engineer/JobDetailPage';
 import { InspectPage } from './pages/engineer/InspectPage';
@@ -95,6 +96,14 @@ export function App() {
                 <Route path="sourcing">{SourcingRoutes}</Route>
                 <Route path="rfqs">{RfqRoutes}</Route>
                 <Route path="quotes">{QuotesRoutes}</Route>
+                <Route path="*" element={<NotBuiltPage />} />
+              </Route>
+            </Route>
+
+            {/* Sales — desktop shell (S-D panel 177:137224). */}
+            <Route path="/s" element={<RequireAuth><RoleGate roles={['SALES']} /></RequireAuth>}>
+              <Route element={<DesktopShell />}>
+                {SalesRoutes}
                 <Route path="*" element={<NotBuiltPage />} />
               </Route>
             </Route>

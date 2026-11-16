@@ -24,7 +24,14 @@ const NAV: Record<Role, NavItem[]> = {
     { to: '/p/inventory', label: 'Inventory', built: false },
     { to: '/p/masters', label: 'Masters', built: false },
   ],
-  SALES: [{ to: '/m/quotes', label: 'Quotes', built: false }],
+  // Figma "Shell / Top nav · Sales" (152:788), S-D panel 177:137224, routed under /s. The quote detail
+  // (/s/quotes/:id) keeps the Sent pill active.
+  SALES: [
+    { to: '/s', label: 'Dashboard', built: true, end: true },
+    { to: '/s/to-send', label: 'To send', built: true },
+    { to: '/s/sent', label: 'Sent', built: true, match: ['/s/quotes'] },
+    { to: '/s/responses', label: 'Responses', built: true },
+  ],
   STORES_QUALITY: [
     { to: '/m/receiving', label: 'GRN receiving', built: false },
     { to: '/m/inventory', label: 'Inventory', built: false },
@@ -58,6 +65,8 @@ export const can = {
   seeSupplierCost: (r: Role) => r === 'PURCHASE' || r === 'MANAGEMENT',
   /** BR-02 intake (JIN, groups, expand, photos, verify, assign) + BR-04 stock check / RFQ / offers / quotes: @Roles('PURCHASE'). */
   purchaseWork: (r: Role) => r === 'PURCHASE',
+  /** BR-04 send (POST /quotes/:id/send) + BR-05 customer response (POST /jobs/:id/quote-responses): @Roles('SALES'). */
+  salesWork: (r: Role) => r === 'SALES',
 };
 
 export const ROLE_LABEL: Record<Role, string> = {

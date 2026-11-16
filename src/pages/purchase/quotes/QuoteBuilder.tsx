@@ -131,7 +131,8 @@ function StateBanner({ quote, latest, flash, responses }: { quote: Quote; latest
   const progressQ = useJobProgress(status === 'SENT' ? quote.job_id : undefined);
   const sentStage = progressQ.data?.stages.find((s) => s.key === 'QUOTE');
   const firstSent = sentStage?.status === 'done' ? sentStage.at : null;
-  const mine = responses.filter((r) => r.quote_revision_id === latest.id);
+  // Match on the BR-04 revision id; `quote_revision_id` is the BR-05 ref id and never equals `latest.id`.
+  const mine = responses.filter((r) => r.source_br04_quote_revision_id === latest.id);
   const last = mine[0];
   if (status === 'DRAFT' && flash && flash.quoteId === quote.id && flash.revNo === latest.revision_no) {
     if (flash.kind === 'revised') {
