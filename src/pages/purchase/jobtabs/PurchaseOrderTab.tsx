@@ -28,7 +28,7 @@ import { EmptyState, ErrorState, StateCard, errorBody } from '../../../ui/deskto
 import { FormErrors, GapNote, InlineAlert } from '../../../ui/desktop/Feedback';
 import { useToast } from '../../../ui/desktop/Toast';
 import { Ic, cx } from '../../../ui/desktop/Icon';
-import type { Tone } from '../../../lib/tones';
+import { TONES, type Tone } from '../../../lib/tones';
 import { formatDate, formatDayTime, formatINR, formatQty } from '../../../lib/format';
 import { CompactField, H3, TabCard, TabSkeleton } from './ui';
 import {
@@ -40,9 +40,7 @@ const STAGES = [
   { status: 'DRAFT', label: 'Draft' }, { status: 'RELEASED', label: 'Released' }, { status: 'ACKNOWLEDGED', label: 'Acknowledged' },
   { status: 'SHIPPED', label: 'Shipped' }, { status: 'RECEIVED', label: 'Received' },
 ] as const;
-const PO_TONE: Record<PurchaseOrderRow['po_status'], Tone> = {
-  DRAFT: 'neutral', RELEASED: 'progress', ACKNOWLEDGED: 'progress', SHIPPED: 'progress', RECEIVED: 'success', CLOSED: 'success', CANCELLED: 'blocked',
-};
+const PO_TONE: Record<PurchaseOrderRow['po_status'], Tone> = TONES.purchaseOrder;
 const h2 = 'min-w-px flex-1 text-[18px] font-semibold leading-[24px] text-fg';
 
 export function PurchaseOrderTab() {

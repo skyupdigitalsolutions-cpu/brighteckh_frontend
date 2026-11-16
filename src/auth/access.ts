@@ -32,10 +32,14 @@ const NAV: Record<Role, NavItem[]> = {
     { to: '/s/sent', label: 'Sent', built: true, match: ['/s/quotes'] },
     { to: '/s/responses', label: 'Responses', built: true },
   ],
+  // Figma "Shell / Top nav · Stores" (ST-D panel 177:139285), routed under /st. Create GRN (/st/receive/:poId) keeps
+  // Receive active; GRN detail keeps GRNs active. Dashboard / Quarantine / Inventory are not built yet.
   STORES_QUALITY: [
-    { to: '/m/receiving', label: 'GRN receiving', built: false },
-    { to: '/m/inventory', label: 'Inventory', built: false },
-    { to: '/m/masters', label: 'Masters', built: false },
+    { to: '/st/dashboard', label: 'Dashboard', built: false },
+    { to: '/st/receive', label: 'Receive', built: true },
+    { to: '/st/grns', label: 'GRNs', built: true },
+    { to: '/st/quarantine', label: 'Quarantine', built: false },
+    { to: '/st/inventory', label: 'Inventory', built: false },
   ],
   MANAGEMENT: [
     { to: '/m/jobs', label: 'Jobs', built: false },
@@ -51,7 +55,9 @@ const NAV: Record<Role, NavItem[]> = {
 };
 
 export const navFor = (role: Role) => NAV[role] ?? [];
-export const homeFor = (role: Role) => (role === 'ENGINEER' ? '/jobs' : navFor(role)[0]?.to ?? '/m/none');
+/** Landing page: the role's first BUILT nav item (Stores' Dashboard pill isn't built, so Stores lands on Receive). */
+export const homeFor = (role: Role) =>
+  (role === 'ENGINEER' ? '/jobs' : (navFor(role).find((i) => i.built) ?? navFor(role)[0])?.to ?? '/m/none');
 
 export function isNavActive(item: NavItem, pathname: string) {
   const p = pathname.replace(/\/+$/, '') || '/';
@@ -67,6 +73,8 @@ export const can = {
   purchaseWork: (r: Role) => r === 'PURCHASE',
   /** BR-04 send (POST /quotes/:id/send) + BR-05 customer response (POST /jobs/:id/quote-responses): @Roles('SALES'). */
   salesWork: (r: Role) => r === 'SALES',
+  /** BR-06 GRN create / line photo / line post + GET /stores/*: @Roles('STORES_QUALITY'). */
+  storesWork: (r: Role) => r === 'STORES_QUALITY',
 };
 
 export const ROLE_LABEL: Record<Role, string> = {

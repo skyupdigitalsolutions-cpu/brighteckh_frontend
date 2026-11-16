@@ -3616,6 +3616,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/stores/receivable-pos": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * POs to receive (G-ST1): RELEASED / ACKNOWLEDGED / SHIPPED supplier POs with ack + latest shipment
+         * @description Paginated: `page`, `page_size` (max 100) -> { rows, total, page, page_size, counts_by_status }. Filters: `status` (comma-separated), `search` (PO no., supplier, job no., sales order no.). `can_receive` = a GRN can be created now (ACKNOWLEDGED / SHIPPED). Quantities only.
+         */
+        get: operations["StoresDeskController_receivablePos"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stores/purchase-orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** PO for receiving (G-ST2): header, lines with item code/name + received/outstanding qty, GRNs. No prices */
+        get: operations["StoresDeskController_purchaseOrder"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stores/grns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GRN register (G-ST3): company GRNs with PO, supplier, line counts and derived grn_status
+         * @description Paginated -> { rows, total, page, page_size, counts_by_status }. Filters: `status` (OPEN / PARTIAL / POSTED, comma-separated), `search` (GRN no., PO no., supplier, job no., sales order no.). Newest received first.
+         */
+        get: operations["StoresDeskController_grns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stores/grns/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** GRN for inspection (G-ST4): lines with item code/name, photos, posted-by and the resulting ledger movements */
+        get: operations["StoresDeskController_grn"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -10512,6 +10586,336 @@ export interface components {
             rows: components["schemas"]["SalesQuoteRow"][];
             /** @description Per-stage totals for the caller's scope under the current `search` only (ignores `stage` and `valid_until_before`). Every stage is present (0 when empty). */
             counts_by_stage: components["schemas"]["SalesStageCounts"];
+        };
+        StoresPoAcknowledgement: {
+            /** @description br06_po_acknowledgements.supplier_reference */
+            supplier_reference: string | null;
+            /**
+             * Format: date
+             * @description br06_po_acknowledgements.expected_delivery_date (YYYY-MM-DD)
+             */
+            expected_delivery_date: string | null;
+            /** Format: date-time */
+            acknowledged_at: string;
+        };
+        StoresPoShipment: {
+            /** @description br06_shipments.carrier */
+            carrier: string | null;
+            /** @description br06_shipments.awb_or_lr_number */
+            awb_or_lr_number: string | null;
+            /**
+             * Format: date
+             * @description br06_shipments.expected_arrival_date (YYYY-MM-DD)
+             */
+            expected_arrival_date: string | null;
+            /** Format: date-time */
+            shipped_at: string;
+        };
+        ReceivablePoRow: {
+            /**
+             * Format: uuid
+             * @description br06_supplier_purchase_orders.id (POST /purchase-orders/:id/grns takes this)
+             */
+            po_id: string;
+            po_number: string;
+            /** @enum {string} */
+            po_status: "DRAFT" | "RELEASED" | "ACKNOWLEDGED" | "SHIPPED" | "RECEIVED" | "CLOSED" | "CANCELLED";
+            /** @enum {string} */
+            purchase_purpose: "CUSTOMER_JOB" | "SALES_ORDER";
+            supplier_name: string;
+            /** Format: uuid */
+            job_id: string | null;
+            /** @description service_jobs.job_number (CUSTOMER_JOB POs) */
+            job_number: string | null;
+            /** Format: uuid */
+            sales_order_id: string | null;
+            /** @description br11_sales_orders.sales_order_number (SALES_ORDER POs) */
+            sales_order_number: string | null;
+            /** Format: date-time */
+            released_at: string | null;
+            /** @description true when POST /purchase-orders/:id/grns will accept a GRN (po_status ACKNOWLEDGED or SHIPPED) */
+            can_receive: boolean;
+            acknowledgement: components["schemas"]["StoresPoAcknowledgement"] | null;
+            /** @description Newest br06_shipments row (by shipped_at); null if none */
+            latest_shipment: components["schemas"]["StoresPoShipment"] | null;
+            /** @description PO lines */
+            lines_total: number;
+            /** @description PO lines whose received quantity (summed over every GRN) is still below the ordered quantity */
+            lines_outstanding: number;
+            /** @description GRNs on this PO with at least one unposted line */
+            open_grns: number;
+        };
+        ReceivablePoStatusCounts: {
+            RELEASED: number;
+            ACKNOWLEDGED: number;
+            SHIPPED: number;
+        };
+        ReceivablePoPage: {
+            /** @description Rows matching the filters (all pages) */
+            total: number;
+            page: number;
+            page_size: number;
+            /** @description SHIPPED first, then ACKNOWLEDGED, then RELEASED; within a status by expected date (shipment expected_arrival_date, else acknowledgement expected_delivery_date) ascending, nulls last; po_number breaks ties. */
+            rows: components["schemas"]["ReceivablePoRow"][];
+            /** @description Per-status totals under the current `search` only (ignores `status`). */
+            counts_by_status: components["schemas"]["ReceivablePoStatusCounts"];
+        };
+        StoresPoLine: {
+            /**
+             * Format: uuid
+             * @description br06_po_lines.id (GrnLineInputDto.po_line_id)
+             */
+            po_line_id: string;
+            line_no: number;
+            /** Format: uuid */
+            item_bridge_id: string;
+            /** @description br03_item_catalog_bridge.item_code */
+            item_code: string;
+            /** @description br03_item_catalog_bridge.item_name */
+            item_name: string;
+            uom: string;
+            /**
+             * Format: decimal
+             * @description br06_po_lines.quantity (numeric, returned as decimal string)
+             */
+            ordered_quantity: string;
+            /**
+             * Format: decimal
+             * @description Sum of br06_grn_lines.received_quantity over every GRN of this PO line (posted or not) (numeric, returned as decimal string)
+             */
+            received_quantity: string;
+            /**
+             * Format: decimal
+             * @description Sum of accepted + rejected + held over POSTED GRN lines (what the PO -> RECEIVED rule counts) (numeric, returned as decimal string)
+             */
+            posted_quantity: string;
+            /**
+             * Format: decimal
+             * @description GREATEST(ordered - received, 0) (numeric, returned as decimal string)
+             */
+            outstanding_quantity: string;
+        };
+        StoresGrnHeaderRow: {
+            /** Format: uuid */
+            grn_id: string;
+            grn_number: string;
+            /** Format: date-time */
+            received_at: string;
+            /** Format: uuid */
+            received_by_id: string;
+            /** @description employees.full_name of received_by_id */
+            received_by_name: string;
+            notes: string | null;
+            lines_total: number;
+            /** @description lines with posted_at set */
+            lines_posted: number;
+            /**
+             * @description OPEN = no line posted, PARTIAL = some, POSTED = every line posted
+             * @enum {string}
+             */
+            grn_status: "OPEN" | "PARTIAL" | "POSTED";
+        };
+        StoresPoDetail: {
+            /**
+             * Format: uuid
+             * @description br06_supplier_purchase_orders.id (POST /purchase-orders/:id/grns takes this)
+             */
+            po_id: string;
+            po_number: string;
+            /** @enum {string} */
+            po_status: "DRAFT" | "RELEASED" | "ACKNOWLEDGED" | "SHIPPED" | "RECEIVED" | "CLOSED" | "CANCELLED";
+            /** @enum {string} */
+            purchase_purpose: "CUSTOMER_JOB" | "SALES_ORDER";
+            supplier_name: string;
+            /** Format: uuid */
+            job_id: string | null;
+            /** @description service_jobs.job_number (CUSTOMER_JOB POs) */
+            job_number: string | null;
+            /** Format: uuid */
+            sales_order_id: string | null;
+            /** @description br11_sales_orders.sales_order_number (SALES_ORDER POs) */
+            sales_order_number: string | null;
+            /** Format: date-time */
+            released_at: string | null;
+            /** @description true when POST /purchase-orders/:id/grns will accept a GRN (po_status ACKNOWLEDGED or SHIPPED) */
+            can_receive: boolean;
+            acknowledgement: components["schemas"]["StoresPoAcknowledgement"] | null;
+            /** @description Newest br06_shipments row (by shipped_at); null if none */
+            latest_shipment: components["schemas"]["StoresPoShipment"] | null;
+            /** @description Ordered by line_no */
+            lines: components["schemas"]["StoresPoLine"][];
+            /** @description GRNs on this PO, newest first */
+            grns: components["schemas"]["StoresGrnHeaderRow"][];
+        };
+        StoresGrnRow: {
+            /** Format: uuid */
+            grn_id: string;
+            grn_number: string;
+            /** Format: date-time */
+            received_at: string;
+            /** Format: uuid */
+            received_by_id: string;
+            /** @description employees.full_name of received_by_id */
+            received_by_name: string;
+            notes: string | null;
+            lines_total: number;
+            /** @description lines with posted_at set */
+            lines_posted: number;
+            /**
+             * @description OPEN = no line posted, PARTIAL = some, POSTED = every line posted
+             * @enum {string}
+             */
+            grn_status: "OPEN" | "PARTIAL" | "POSTED";
+            /** Format: uuid */
+            po_id: string;
+            po_number: string;
+            supplier_name: string;
+            job_number: string | null;
+            sales_order_number: string | null;
+        };
+        StoresGrnStatusCounts: {
+            OPEN: number;
+            PARTIAL: number;
+            POSTED: number;
+        };
+        StoresGrnPage: {
+            /** @description Rows matching the filters (all pages) */
+            total: number;
+            page: number;
+            page_size: number;
+            /** @description received_at descending; grn_number breaks ties */
+            rows: components["schemas"]["StoresGrnRow"][];
+            /** @description Per-status totals under the current `search` only (ignores `status`). */
+            counts_by_status: components["schemas"]["StoresGrnStatusCounts"];
+        };
+        StoresGrnLineMedia: {
+            /** Format: uuid */
+            id: string;
+            /** @description GET it with the bearer token to read the bytes (/api/uploads/:id) */
+            file_uri: string;
+            file_name: string;
+            /** Format: uuid */
+            uploaded_by_id: string;
+            /** Format: date-time */
+            uploaded_at: string;
+        };
+        StoresLedgerMovement: {
+            /**
+             * Format: uuid
+             * @description fdn_inventory_journal.id (= the *_movement_ref on the GRN line)
+             */
+            id: string;
+            /** @enum {string} */
+            movement_type: "RECEIPT" | "ISSUE" | "CONSUME" | "RETURN" | "SUPPLIER_RETURN" | "TRANSFER" | "ADJUST";
+            /**
+             * Format: decimal
+             * @description fdn_inventory_journal.qty (numeric, returned as decimal string)
+             */
+            qty: string;
+            uom: string;
+            /** @description fdn_inventory_locations.role of from_location_id */
+            from_location_role: string | null;
+            from_location_code: string | null;
+            /** @description fdn_inventory_locations.role of to_location_id (MAIN_STORE for accepted, QUARANTINE for rejected + held) */
+            to_location_role: string | null;
+            to_location_code: string | null;
+            /** @enum {string} */
+            status: "POSTED" | "REVERSED";
+            /** Format: date-time */
+            posted_at: string;
+        };
+        StoresGrnLine: {
+            /**
+             * Format: uuid
+             * @description br06_grn_lines.id (POST /grn-lines/:id/media, /post)
+             */
+            id: string;
+            /** Format: uuid */
+            po_line_id: string;
+            /** @description br06_po_lines.line_no */
+            line_no: number;
+            /** Format: uuid */
+            item_bridge_id: string;
+            item_code: string;
+            item_name: string;
+            uom: string;
+            /**
+             * Format: decimal
+             * @description ordered_quantity snapshot (numeric, returned as decimal string)
+             */
+            ordered_quantity: string;
+            /**
+             * Format: decimal
+             * @description received_quantity (numeric, returned as decimal string)
+             */
+            received_quantity: string;
+            /**
+             * Format: decimal
+             * @description accepted_quantity (numeric, returned as decimal string)
+             */
+            accepted_quantity: string;
+            /**
+             * Format: decimal
+             * @description rejected_quantity (numeric, returned as decimal string)
+             */
+            rejected_quantity: string;
+            /**
+             * Format: decimal
+             * @description held_quantity (numeric, returned as decimal string)
+             */
+            held_quantity: string;
+            /**
+             * Format: decimal
+             * @description returned_quantity (supplier return, Purchase) (numeric, returned as decimal string)
+             */
+            returned_quantity: string;
+            /** Format: date-time */
+            posted_at: string | null;
+            /**
+             * Format: uuid
+             * @description actor of the BR06_GRN_LINE_DISPOSED audit row
+             */
+            posted_by_id: string | null;
+            /** @description employees.full_name of posted_by_id */
+            posted_by_name: string | null;
+            /** Format: uuid */
+            main_store_movement_ref: string | null;
+            /** Format: uuid */
+            quarantine_movement_ref: string | null;
+            /** Format: uuid */
+            return_movement_ref: string | null;
+            /** @description br06_grn_line_media, oldest first (the post gate needs >= 1) */
+            media: components["schemas"]["StoresGrnLineMedia"][];
+            /** @description fdn_inventory_journal rows with reference_id = this line, oldest first */
+            movements: components["schemas"]["StoresLedgerMovement"][];
+        };
+        StoresGrnDetail: {
+            /** Format: uuid */
+            grn_id: string;
+            grn_number: string;
+            /** Format: date-time */
+            received_at: string;
+            /** Format: uuid */
+            received_by_id: string;
+            /** @description employees.full_name of received_by_id */
+            received_by_name: string;
+            notes: string | null;
+            lines_total: number;
+            /** @description lines with posted_at set */
+            lines_posted: number;
+            /**
+             * @description OPEN = no line posted, PARTIAL = some, POSTED = every line posted
+             * @enum {string}
+             */
+            grn_status: "OPEN" | "PARTIAL" | "POSTED";
+            /** Format: uuid */
+            po_id: string;
+            po_number: string;
+            supplier_name: string;
+            job_number: string | null;
+            sales_order_number: string | null;
+            /** @description Ordered by PO line_no */
+            lines: components["schemas"]["StoresGrnLine"][];
         };
     };
     responses: never;
@@ -24206,6 +24610,244 @@ export interface operations {
                 };
             };
             /** @description Requires role: SALES */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    StoresDeskController_receivablePos: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Case-insensitive substring match (see each endpoint for the fields searched) */
+                search?: string;
+                /** @description PO status (comma-separated; one or more of RELEASED, ACKNOWLEDGED, SHIPPED). Omitted = all three. */
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceivablePoPage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: STORES_QUALITY */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    StoresDeskController_purchaseOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoresPoDetail"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: STORES_QUALITY */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    StoresDeskController_grns: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Case-insensitive substring match (see each endpoint for the fields searched) */
+                search?: string;
+                /** @description Derived GRN status (comma-separated; one or more of OPEN, PARTIAL, POSTED). Omitted = all. */
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoresGrnPage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: STORES_QUALITY */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    StoresDeskController_grn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoresGrnDetail"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: STORES_QUALITY */
             403: {
                 headers: {
                     [name: string]: unknown;

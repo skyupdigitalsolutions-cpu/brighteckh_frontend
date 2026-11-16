@@ -64,6 +64,14 @@ const dmtf = new Intl.DateTimeFormat('en-GB', {
   timeZone: IST, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false,
 });
 const myf = new Intl.DateTimeFormat('en-GB', { timeZone: IST, month: 'short', year: 'numeric' });
+const dmf = new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC', day: '2-digit', month: 'short' });
+
+/** Plain date "2026-11-10" (no time, no zone) -> "10 Nov". Read as a calendar date, never shifted by a timezone. */
+export function formatDayMonth(date: string | null | undefined): string {
+  if (!date) return '—';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(date);
+  return m ? dmf.format(new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]))) : date;
+}
 
 /** ISO -> "05 Nov, 09:20" in IST (desktop register "Received" column, Figma 177:102734). */
 export function formatDayTime(iso: string | null | undefined): string {

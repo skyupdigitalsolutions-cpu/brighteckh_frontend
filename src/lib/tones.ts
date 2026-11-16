@@ -77,10 +77,17 @@ const offer: Map<S<'OfferRecorded'>['status']> = {
   RECEIVED: 'success', EXPIRED: 'blocked', REVALIDATION_REQUIRED: 'blocked', WITHDRAWN: 'neutral',
 };
 
+// ---- BR-06 supplier PO + GRN. PO tones as already drawn on the Purchase PO tab (D·P9); GRN status is the server-derived
+// StoresGrnRow.grn_status (OPEN neutral / PARTIAL progress / POSTED success, as drawn on GL0 177:139959).
+const purchaseOrder: Map<S<'PurchaseOrderDetail'>['po_status']> = {
+  DRAFT: 'neutral', RELEASED: 'progress', ACKNOWLEDGED: 'progress', SHIPPED: 'progress', RECEIVED: 'success', CLOSED: 'success', CANCELLED: 'blocked',
+};
+const grn: Map<S<'StoresGrnRow'>['grn_status']> = { OPEN: 'neutral', PARTIAL: 'progress', POSTED: 'success' };
+
 export const TONES = {
   job, assignment, route, session, inspectionReport, reportVersion, outcome, materialRequest, changeRequest,
   itemStatus, repairReport, testResult, issue, slaState, reviewDecision, materialReturn, consumption,
-  receipt, unitVerification, dcException, rfq, offerTechnical, quote, shortage, invite, offer,
+  receipt, unitVerification, dcException, rfq, offerTechnical, quote, shortage, invite, offer, purchaseOrder, grn,
 } as const;
 export type ToneDomain = keyof typeof TONES;
 

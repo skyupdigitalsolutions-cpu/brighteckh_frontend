@@ -22,6 +22,7 @@ import { RfqRoutes } from './pages/purchase/sourcing/rfq-routes';
 import { JobQuoteTab } from './pages/purchase/quotes/JobQuoteTab';
 import { QuotesRoutes } from './pages/purchase/quotes/routes';
 import { SalesRoutes } from './pages/sales/routes';
+import { StoresRoutes } from './pages/stores/routes';
 import { MyJobsPage } from './pages/engineer/MyJobsPage';
 import { JobDetailPage } from './pages/engineer/JobDetailPage';
 import { InspectPage } from './pages/engineer/InspectPage';
@@ -104,6 +105,14 @@ export function App() {
             <Route path="/s" element={<RequireAuth><RoleGate roles={['SALES']} /></RequireAuth>}>
               <Route element={<DesktopShell />}>
                 {SalesRoutes}
+                <Route path="*" element={<NotBuiltPage />} />
+              </Route>
+            </Route>
+
+            {/* Stores / Quality — desktop shell (ST-D panel 177:139285). */}
+            <Route path="/st" element={<RequireAuth><RoleGate roles={['STORES_QUALITY']} /></RequireAuth>}>
+              <Route element={<DesktopShell />}>
+                {StoresRoutes}
                 <Route path="*" element={<NotBuiltPage />} />
               </Route>
             </Route>
