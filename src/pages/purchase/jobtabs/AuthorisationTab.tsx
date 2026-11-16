@@ -24,7 +24,7 @@ import { IconCheck, IconFilePlus, IconReceipt, IconRefresh, IconSend, IconShield
 import { useMe } from '../../../auth/AuthProvider';
 import { can } from '../../../auth/access';
 import { useJobWorkspace } from '../job/JobWorkspace';
-import { useEmployeesByIds, useItemBridgeByIds, useQuote, useQuotes } from '../api';
+import { useEmployeesByIds, useItemBridgeByIds, useQuotes } from '../api';
 import { Badge } from '../../../ui/desktop/Badge';
 import { Button, ButtonLink } from '../../../ui/desktop/Button';
 import { Drawer } from '../../../ui/desktop/Drawer';
@@ -39,13 +39,16 @@ import {
   useAuthoriseJob, useCreateOrderAllocation, useCustomerAuthorities, useJobAuthorisations, useJobMaterialRequests,
   useJobReleases, useJobReservations, useJobStockRechecks, useOrderAllocations, useQuoteResponses,
   useRecordCustomerAuthority, useReleaseJob, useReserveMaterial, useStockRecheck, useVerifyCustomerAuthority,
-  useVerifyOrderAllocation, type CustomerAuthority, type StockRecheck, type StockRecheckLine,
+  useVerifyOrderAllocation, type CustomerAuthority, type QuoteResponseEvent, type StockRecheck, type StockRecheckLine,
 } from './data';
 
 type StepState = 'done' | 'current' | 'pending';
 type Step = { title: string; meta: ReactNode; badge?: { tone: Tone; label: string }; done: boolean };
 
 const h2 = 'min-w-px flex-1 text-[18px] font-semibold leading-[24px] text-fg';
+const RESPONSE_TONE: Partial<Record<QuoteResponseEvent['response_type'], Tone>> = {
+  ACCEPTED: 'success', AWAITING_RESPONSE: 'neutral', REJECTED: 'blocked', EXPIRED: 'blocked', ON_HOLD: 'blocked',
+};
 const num = (v: string | null | undefined) => (v == null ? 0 : Number(v) || 0);
 
 export function AuthorisationTab() {
@@ -60,7 +63,6 @@ export function AuthorisationTab() {
   const relQ = useJobReleases(job.id, isPurchase);
   const resQ = useJobReservations(job.id, isPurchase);
   const quotesQ = useQuotes(job.id);
-  const quoteQ = useQuote(quotesQ.data?.[0]?.id);
 
   if (!isPurchase) {
     return <StateCard><EmptyState icon={IconShieldCheck} title="Authorisation is handled by Purchase" body="Customer authority, authorisation, release and reservations are Purchase-only records." /></StateCard>;
@@ -70,8 +72,11 @@ export function AuthorisationTab() {
   if (failed) return <StateCard><ErrorState title="Couldn't load the authorisation records" body={errorBody(failed.error)} onRetry={() => qs.forEach((q) => q.refetch())} retrying={qs.some((q) => q.isFetching)} /></StateCard>;
   if (qs.some((q) => q.isPending)) return <TabSkeleton right={420} />;
 
-  const accepted = respQ.data!.find((r) => r.response_type === 'ACCEPTED');
-  const latestResp = respQ.data![0];
+  // Step 1 = the LATEST customer response (by responded_at): a newer revision re-opens the step until it is ACCEPTED,
+  // so title, badge and done-state all come from the same row.
+  const responses = [...respQ.data!].sort((a, b) => b.responded_at.localeCompare(a.responded_at));
+  const latestResp = responses[0];
+  const accepted = latestResp?.response_type === 'ACCEPTED' ? latestResp : undefined;
   const verifiedAuth = authQ.data!.find((a) => a.order_status === 'VERIFIED');
   const latestAuth = authQ.data![0];
   const verifiedAlloc = allocQ.data!.find((a) => a.allocation_status === 'VERIFIED');
@@ -83,14 +88,16 @@ export function AuthorisationTab() {
   const reservable = (recheck?.lines ?? []).filter((l) => num(l.available_store_quantity) > 0);
   const unreserved = reservable.filter((l) => !committed.some((r) => r.stock_recheck_line_id === l.id));
   const shortLines = (recheck?.lines ?? []).filter((l) => num(l.available_store_quantity) < num(l.required_quantity));
-  const revision = quoteQ.data?.revisions.find((r) => r.id === (accepted?.quote_revision_id ?? verifiedAlloc?.accepted_quote_revision_id));
-  const revLabel = revision && quoteQ.data ? `${quoteQ.data.quote_number} r${revision.revision_no}` : 'the accepted quote';
+  // G-B5-2: responses / allocations carry a br05_quote_revision_refs id and no read exposes its BR-04 revision
+  // (source_br04_quote_id), so the revision can't be resolved. The quote number is safe when the job has one quote.
+  const quotes = quotesQ.data ?? [];
+  const revLabel = quotes.length === 1 ? quotes[0]!.quote_number : 'the accepted quote';
 
   const steps: Step[] = [
     {
       title: `Customer response${latestResp ? ` · ${enumLabel(latestResp.response_type)}` : ''}`,
       meta: latestResp ? [formatDayTime(latestResp.responded_at), latestResp.response_channel?.toLowerCase()].filter(Boolean).join(' · ') : 'Recorded by Sales on the Quote tab',
-      badge: accepted ? { tone: 'success', label: 'ACCEPTED' } : undefined,
+      badge: latestResp ? { tone: RESPONSE_TONE[latestResp.response_type] ?? 'progress', label: enumLabel(latestResp.response_type) } : undefined,
       done: !!accepted,
     },
     {
@@ -128,11 +135,14 @@ export function AuthorisationTab() {
 
   return (
     <div className="flex min-h-[738px] w-full flex-1 items-stretch gap-[16px]">
-      <TabCard className="w-[420px] shrink-0">
+      <TabCard width={420}>
         <div className="flex w-full items-center overflow-clip"><h2 className={h2}>Progress</h2></div>
         <ol className="flex w-full flex-col">
           {steps.map((s, i) => <StepRow key={i} n={i + 1} step={s} state={s.done ? 'done' : i === cur ? 'current' : 'pending'} last={i === steps.length - 1} />)}
         </ol>
+        {allocQ.data!.length > 0 && (
+          <GapNote code="G-B5-2">Allocations show the quote number only: the API doesn&apos;t expose which quote revision a BR-05 revision ref points to.</GapNote>
+        )}
       </TabCard>
       <TabCard className="min-w-px flex-1">
         {cur === 0 && (
@@ -141,14 +151,13 @@ export function AuthorisationTab() {
             <div className="flex"><ButtonLink to={`/p/jobs/${job.id}/quote`} kind="secondary">Open quote</ButtonLink></div>
           </Panel>
         )}
-        {cur === 1 && <AuthorityPanel authorities={authQ.data!} suggestedPreTax={revision?.revised_pre_tax} suggestedTax={revision?.tax_total} />}
+        {cur === 1 && <AuthorityPanel authorities={authQ.data!} />}
         {cur === 2 && (
           <AllocationPanel
             verified={authQ.data!.filter((a) => a.order_status === 'VERIFIED')}
             proposed={allocQ.data!.find((a) => a.allocation_status === 'PROPOSED')}
             revisionId={accepted?.quote_revision_id}
             revLabel={revLabel}
-            suggested={revision?.revised_pre_tax}
           />
         )}
         {cur === 3 && <AuthorisePanel allocationId={verifiedAlloc!.id} amount={verifiedAlloc!.allocated_pre_tax} revLabel={revLabel} />}
@@ -190,7 +199,7 @@ function StepRow({ n, step, state, last }: { n: number; step: Step; state: StepS
         <p className={cx(state === 'current' ? 'text-[15px] font-semibold' : 'text-[14px] font-medium', 'leading-[20px]', state === 'pending' ? 'text-fg-muted' : 'text-fg')}>{step.title}</p>
         <p className="truncate text-[12px] leading-[16px] text-fg-2">{step.meta}</p>
       </div>
-      {state === 'done' && step.badge && <Badge tone={step.badge.tone} label={step.badge.label} />}
+      {state !== 'pending' && step.badge && <Badge tone={step.badge.tone} label={step.badge.label} />}
     </li>
   );
 }

@@ -63,7 +63,7 @@ export function RepairTestTab() {
         <MaterialCard s={s} isPurchase={isPurchase} />
         <TestsCard s={s} />
       </div>
-      <TabCard className="w-[420px] shrink-0">
+      <TabCard width={420}>
         {nothingYet && !isPurchase ? <EmptyState icon={IconTool} title="Repair hasn't started" body="Material, repair time and test cycles appear here once the engineer starts." /> : <DecisionPanel s={s} isPurchase={isPurchase} />}
       </TabCard>
     </div>
@@ -127,7 +127,7 @@ function TestsCard({ s }: { s: RepairStatus }) {
   const t = s.tests;
   const open = t.test_sla.instances.find((x) => x.state === 'OPEN' || x.state === 'PAUSED') ?? t.test_sla.instances[0];
   return (
-    <TabCard className="min-h-px flex-1">
+    <TabCard className="flex-[1_0_auto]">
       <div className="flex w-full items-center gap-[10px] overflow-clip">
         <h2 className={h2}>Test cycles</h2>
         {open && <Badge tone={toneOf('slaState', open.state)} label={`SLA ${open.state}${open.due_at && open.state !== 'MET' ? ` · DUE ${formatTime(open.due_at)}` : ''}`} />}

@@ -671,7 +671,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * The job's material requests (newest first) with lines, change requests and each line's live fulfilment
+         * @description Lines add item_code / item_name and `fulfilment` = { allocatable_now (ledger fdn_allocatable for the item, company-wide), reserved_quantity (COMMITTED BR-05 reservations), issued / consumed / returned_quantity (BR-07 issues from those reservations) }. Computed at read time; nothing is stored. Empty array when the job has none.
+         */
+        get: operations["Br03Controller_getJobMaterialRequests"];
         put?: never;
         post: operations["Br03Controller_createMaterialRequest"];
         delete?: never;
@@ -1019,7 +1023,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Customer quote responses, newest first */
+        /** Customer quote responses, newest first (+ the BR-04 quote revision each one refers to) */
         get: operations["Br05Controller_getQuoteResponses"];
         put?: never;
         post: operations["Br05Controller_recordQuoteResponse"];
@@ -1069,7 +1073,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Order-to-job allocations, newest first */
+        /** Order-to-job allocations, newest first (+ the BR-04 quote revision each one is against) */
         get: operations["Br05Controller_getOrderAllocations"];
         put?: never;
         post: operations["Br05Controller_createOrderAllocation"];
@@ -4583,6 +4587,106 @@ export interface components {
             /** Format: date-time */
             created_at: string;
         };
+        MaterialLineFulfilment: {
+            /** @description Ledger fdn_allocatable(company, item) right now: MAIN_STORE on hand minus active ledger reservations (the same read BR-04 stock checks / BR-05 rechecks use). Company-wide for the item, not reserved for this job. */
+            allocatable_now: number;
+            /** @description Σ COMMITTED BR-05 reservations for this line (stays counted after issue) */
+            reserved_quantity: number;
+            /** @description Σ BR-07 issued_quantity of the issues made from those reservations */
+            issued_quantity: number;
+            /** @description Σ BR-07 consumed_quantity of those issues */
+            consumed_quantity: number;
+            /** @description Σ BR-07 returned_quantity (verified returns) of those issues */
+            returned_quantity: number;
+        };
+        JobMaterialRequestLine: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            request_id: string;
+            /** Format: uuid */
+            item_bridge_id: string;
+            /**
+             * Format: decimal
+             * @description numeric, returned as decimal string
+             */
+            quantity: string;
+            uom_snapshot: string;
+            /**
+             * Format: decimal
+             * @description numeric, returned as decimal string
+             */
+            available_stock_snapshot: string | null;
+            preferred_manufacturer: string | null;
+            preferred_part_number: string | null;
+            preference_reason: string | null;
+            technical_note: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** @description br03_item_catalog_bridge.item_code */
+            item_code: string | null;
+            /** @description br03_item_catalog_bridge.item_name */
+            item_name: string | null;
+            fulfilment: components["schemas"]["MaterialLineFulfilment"];
+        };
+        Br03MaterialChangeRequestsRow: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            material_request_id: string;
+            /** Format: uuid */
+            requested_by_id: string;
+            change_reason: string;
+            /** @description JSON */
+            proposed_change: Record<string, never>;
+            /** @enum {string} */
+            review_status: "PENDING" | "ACCEPTED" | "REJECTED";
+            /** Format: uuid */
+            reviewed_by_id: string | null;
+            /** Format: date-time */
+            reviewed_at: string | null;
+            review_comment: string | null;
+        };
+        JobMaterialRequest: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            company_id: string;
+            /** Format: uuid */
+            job_id: string;
+            /** Format: uuid */
+            inspection_version_id: string;
+            /** Format: uuid */
+            responsible_engineer_id: string;
+            request_number: string;
+            /** @enum {string} */
+            status: "DRAFT" | "SUBMITTED" | "PROCESSING" | "RETURNED" | "CHANGE_REQUESTED" | "WITHDRAWN" | "CLOSED";
+            /** @enum {string} */
+            priority: "NORMAL" | "URGENT" | "CRITICAL";
+            /**
+             * Format: date-time
+             * @description date column, serialised as ISO timestamp
+             */
+            required_by_date: string | null;
+            required_by_reason: string | null;
+            /** Format: date-time */
+            submitted_at: string | null;
+            /** Format: date-time */
+            self_edit_deadline_at: string | null;
+            /** Format: date-time */
+            purchase_processing_started_at: string | null;
+            /** Format: uuid */
+            purchase_started_by_id: string | null;
+            current_version_no: number;
+            /** Format: date-time */
+            closed_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** @description Ordered by created_at */
+            lines: components["schemas"]["JobMaterialRequestLine"][];
+            /** @description Ordered by id */
+            change_requests: components["schemas"]["Br03MaterialChangeRequestsRow"][];
+        };
         Br03MaterialRequestLinesRow: {
             /** Format: uuid */
             id: string;
@@ -4607,24 +4711,6 @@ export interface components {
             technical_note: string | null;
             /** Format: date-time */
             created_at: string;
-        };
-        Br03MaterialChangeRequestsRow: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            material_request_id: string;
-            /** Format: uuid */
-            requested_by_id: string;
-            change_reason: string;
-            /** @description JSON */
-            proposed_change: Record<string, never>;
-            /** @enum {string} */
-            review_status: "PENDING" | "ACCEPTED" | "REJECTED";
-            /** Format: uuid */
-            reviewed_by_id: string | null;
-            /** Format: date-time */
-            reviewed_at: string | null;
-            review_comment: string | null;
         };
         MaterialRequestDetail: {
             /** Format: uuid */
@@ -5422,6 +5508,21 @@ export interface components {
             procurement_offer_line_id: string | null;
             /** @description Ordered by line_no */
             lines: components["schemas"]["Br04CustomerQuoteLinesRow"][];
+            /**
+             * Format: uuid
+             * @description br04_quote_sales_handoffs.assigned_sales_id for this revision; null until it is released to Sales
+             */
+            assigned_sales_id: string | null;
+            /**
+             * Format: uuid
+             * @description br04_quote_sales_handoffs.released_by_purchase_id
+             */
+            released_to_sales_by_id: string | null;
+            /**
+             * Format: date-time
+             * @description br04_quote_sales_handoffs.released_at
+             */
+            released_to_sales_at: string | null;
         };
         QuoteDetail: {
             /** Format: uuid */
@@ -5493,6 +5594,37 @@ export interface components {
              */
             quote_revision_ref_id: string;
             response: components["schemas"]["Br05CustomerResponseEventsRow"];
+        };
+        QuoteResponseEvent: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            quote_revision_id: string;
+            /** @enum {string} */
+            response_type: "AWAITING_RESPONSE" | "ACCEPTED" | "COUNTER_OFFER" | "TECHNICAL_QUERY" | "PARTIAL_ACCEPTANCE" | "ON_HOLD" | "REJECTED" | "EXPIRED";
+            /** @enum {string|null} */
+            response_channel: "EMAIL" | "WHATSAPP" | "CALL" | "IN_PERSON" | "OTHER" | null;
+            customer_contact: string | null;
+            response_notes: string | null;
+            evidence_uri: string | null;
+            /** Format: date-time */
+            responded_at: string;
+            /** Format: uuid */
+            recorded_by_id: string;
+            /**
+             * Format: uuid
+             * @description br04_customer_quote_revisions.id the BR-05 ref points to (br05_quote_revision_refs.source_br04_quote_id)
+             */
+            source_br04_quote_revision_id: string;
+            /**
+             * Format: uuid
+             * @description br04_customer_quotes.id of that revision
+             */
+            quote_id: string;
+            /** @description br04_customer_quotes.quote_number */
+            quote_number: string;
+            /** @description br04_customer_quote_revisions.revision_no (0-based, as stored) */
+            revision_no: number;
         };
         CustomerAuthorityDto: {
             /** @enum {string} */
@@ -5572,6 +5704,43 @@ export interface components {
             allocation_status: "PROPOSED" | "VERIFIED" | "SUSPENDED" | "CANCELLED";
             /** Format: date-time */
             created_at: string;
+        };
+        OrderAllocation: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            company_id: string;
+            /** Format: uuid */
+            order_id: string;
+            /** Format: uuid */
+            job_id: string;
+            /** Format: uuid */
+            accepted_quote_revision_id: string;
+            /**
+             * Format: decimal
+             * @description numeric, returned as decimal string
+             */
+            allocated_pre_tax: string;
+            /** @description JSON */
+            approved_scope_snapshot: Record<string, never>;
+            /** @enum {string} */
+            allocation_status: "PROPOSED" | "VERIFIED" | "SUSPENDED" | "CANCELLED";
+            /** Format: date-time */
+            created_at: string;
+            /**
+             * Format: uuid
+             * @description br04_customer_quote_revisions.id the BR-05 ref points to (br05_quote_revision_refs.source_br04_quote_id)
+             */
+            source_br04_quote_revision_id: string;
+            /**
+             * Format: uuid
+             * @description br04_customer_quotes.id of that revision
+             */
+            quote_id: string;
+            /** @description br04_customer_quotes.quote_number */
+            quote_number: string;
+            /** @description br04_customer_quote_revisions.revision_no (0-based, as stored) */
+            revision_no: number;
         };
         AuthoriseJobDto: {
             order_job_allocation_id: string;
@@ -12663,6 +12832,63 @@ export interface operations {
             };
         };
     };
+    Br03Controller_getJobMaterialRequests: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobMaterialRequest"][];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: PURCHASE | MANAGEMENT */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     Br03Controller_createMaterialRequest: {
         parameters: {
             query?: never;
@@ -14056,7 +14282,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Br05CustomerResponseEventsRow"][];
+                    "application/json": components["schemas"]["QuoteResponseEvent"][];
                 };
             };
             /** @description Validation or business-rule failure (including a malformed :id) */
@@ -14344,7 +14570,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Br05OrderJobAllocationsRow"][];
+                    "application/json": components["schemas"]["OrderAllocation"][];
                 };
             };
             /** @description Validation or business-rule failure (including a malformed :id) */

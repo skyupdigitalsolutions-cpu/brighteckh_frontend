@@ -26,7 +26,7 @@ import { FormErrors, InlineAlert } from '../../../ui/desktop/Feedback';
 import { useToast } from '../../../ui/desktop/Toast';
 import { AuthedImage } from '../../../ui/desktop/AuthedImage';
 import { Ic } from '../../../ui/desktop/Icon';
-import { enumLabel, formatDayTime, formatDuration } from '../../../lib/format';
+import { displayVersion, enumLabel, formatDayTime, formatDuration } from '../../../lib/format';
 import { TimelineItem, type TimelineTone } from '../sourcing/ui';
 import { CompactField, Fact, H3, TabCard, TabSkeleton } from './ui';
 import { useInspectionMedia, useInspectionReport, useReviewInspection, type InspectionMedia, type InspectionReport } from './data';
@@ -70,7 +70,7 @@ export function InspectionTab() {
   return (
     <div className="flex min-h-[738px] w-full flex-1 items-stretch gap-[16px]">
       <ReportCard report={report} media={mediaQ.data} mediaLoading={mediaQ.isPending} mediaError={mediaQ.isError} />
-      <div className="flex w-[400px] shrink-0 flex-col gap-[16px] overflow-clip">
+      <div className="flex w-[400px] shrink-0 flex-col gap-[16px]">
         <TabCard className="shrink-0">
           <H3>Inspection time</H3>
           {sessionsQ.isError ? <p className="text-[12px] leading-[16px] text-st-blocked-fg">{errorBody(sessionsQ.error)}</p> : (
@@ -102,7 +102,7 @@ function ReportCard({ report, media, mediaLoading, mediaError }: {
   return (
     <TabCard className="min-w-px flex-1">
       <div className="flex w-full items-center gap-[10px] overflow-clip">
-        <h2 className="min-w-px flex-1 text-[18px] font-semibold leading-[24px] text-fg">Inspection report · version {v.version_no}</h2>
+        <h2 className="min-w-px flex-1 text-[18px] font-semibold leading-[24px] text-fg" title={`API version_no ${v.version_no}`}>Inspection report · version {displayVersion(v.version_no)}</h2>
         <StatusPill domain="reportVersion" value={v.version_status} />
       </div>
       <div className="flex w-full items-center gap-[12px] overflow-clip rounded-[16px] border border-brand-border bg-brand-subtle px-[16px] py-[14px]">
@@ -113,7 +113,7 @@ function ReportCard({ report, media, mediaLoading, mediaError }: {
         <StatusPill domain="outcome" value={v.outcome} />
       </div>
       {v.amendment_reason && (
-        <InlineAlert tone="neutral" title={`Why version ${v.version_no}`}>{v.amendment_reason}</InlineAlert>
+        <InlineAlert tone="neutral" title={`Why version ${displayVersion(v.version_no)}`}>{v.amendment_reason}</InlineAlert>
       )}
       <H3>Findings</H3>
       <p className="w-full whitespace-pre-line text-[14px] leading-[20px] text-fg-2">{v.inspection_description}</p>
@@ -164,12 +164,12 @@ function HistoryCard({ report, firstSessionAt, firstSessionBy }: { report: Inspe
   const name = (id?: string | null) => (id ? empQ.data?.[id]?.full_name ?? null : null);
   type Ev = { at: string; title: string; actor: string | null; detail?: string | null; tone: TimelineTone };
   const ev: Ev[] = [];
-  for (const v of report.versions) ev.push({ at: v.submitted_at, title: `Version ${v.version_no} submitted`, actor: name(v.engineer_id), tone: 'progress' });
+  for (const v of report.versions) ev.push({ at: v.submitted_at, title: `Version ${displayVersion(v.version_no)} submitted`, actor: name(v.engineer_id), tone: 'progress' });
   for (const r of report.reviews) {
     const vno = report.versions.find((v) => v.id === r.version_id)?.version_no;
     ev.push({
       at: r.reviewed_at,
-      title: r.review_decision === 'ACCEPT' ? `Version ${vno ?? ''} accepted`.replace('  ', ' ') : `Version ${vno ?? ''} returned`.replace('  ', ' '),
+      title: `${vno != null ? `Version ${displayVersion(vno)}` : 'Report'} ${r.review_decision === 'ACCEPT' ? 'accepted' : 'returned'}`,
       actor: name(r.reviewer_id), detail: r.review_comment, tone: r.review_decision === 'ACCEPT' ? 'success' : 'neutral',
     });
   }
@@ -203,7 +203,7 @@ function ReviewCard({ jobId, report, canReview }: { jobId: string; report: Inspe
       onSuccess: () => {
         setComment(''); setTried(null);
         toast(decision === 'ACCEPT'
-          ? { tone: 'success', title: 'Report accepted', body: `Version ${v?.version_no ?? ''} is now the accepted inspection report.` }
+          ? { tone: 'success', title: 'Report accepted', body: v ? `Version ${displayVersion(v.version_no)} is now the accepted inspection report.` : 'The report is accepted.' }
           : { tone: 'progress', title: 'Returned for a new version', body: 'The engineer sees your comment on their report screen.' });
       },
     });
@@ -225,7 +225,7 @@ function ReviewCard({ jobId, report, canReview }: { jobId: string; report: Inspe
         <div className="min-h-px w-px flex-1" />
         <FormErrors error={m.error} title="The review wasn't saved" />
         <div className="flex w-full items-start gap-[10px] [&>*]:min-w-px [&>*]:flex-1">
-          <Button kind="secondary" icon={<Ic icon={IconRefresh} size={18} />} disabled={m.isPending} onClick={() => submit('RETURN')}>Return for v{report.current_version_no + 1}</Button>
+          <Button kind="secondary" icon={<Ic icon={IconRefresh} size={18} />} disabled={m.isPending} onClick={() => submit('RETURN')}>Return for v{displayVersion(report.current_version_no) + 1}</Button>
           <Button kind="primary" icon={<Ic icon={IconCheck} size={18} />} busy={m.isPending && m.variables?.decision === 'ACCEPT'} disabled={m.isPending} onClick={() => submit('ACCEPT')}>Accept report</Button>
         </div>
       </>
@@ -244,7 +244,7 @@ function ReviewCard({ jobId, report, canReview }: { jobId: string; report: Inspe
     body = <p className="text-[14px] leading-[20px] text-fg-2">{report.status === 'SUBMITTED' ? 'Waiting for Purchase to review this version.' : `Report ${enumLabel(report.status)}.`}</p>;
   }
   return (
-    <TabCard className="min-h-px flex-1">
+    <TabCard className="flex-[1_0_auto]">
       <H3>Your review</H3>
       {body}
     </TabCard>

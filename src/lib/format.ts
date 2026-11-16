@@ -84,3 +84,9 @@ export function formatDuration(totalSeconds: number | string | null | undefined)
 
 /** AWAITING_ASSIGNMENT -> "AWAITING ASSIGNMENT" (badge label rule). */
 export const enumLabel = (v: string) => v.replace(/_/g, ' ');
+
+/**
+ * Inspection report versions are 0-based in the API (version_no 0 = the first version); Figma and users count from 1
+ * ("version 1", "Return for v2"). Display only — always send / compare the API's version_no.
+ */
+export const displayVersion = (versionNo: number) => versionNo + 1;

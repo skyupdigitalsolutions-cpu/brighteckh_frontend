@@ -9,8 +9,20 @@
 import { useId, type InputHTMLAttributes, type ReactNode } from 'react';
 import { cx } from '../../../ui/desktop/Icon';
 
-export function TabCard({ children, className }: { children: ReactNode; className?: string }) {
-  return <section className={cx('glass-strong flex w-full flex-col items-start gap-[14px] overflow-clip rounded-[24px] p-[20px]', className)}>{children}</section>;
+/**
+ * `width` = a fixed column (e.g. the 400 / 420 right columns): set inline + shrink-0 and NOT combined with w-full.
+ * (A `w-[420px]` class can't override the base w-full reliably — both are single-property utilities and the CSS
+ * order decides, which squeezed the neighbouring card to ~42px on Authorisation / Repair & test.)
+ */
+export function TabCard({ children, className, width }: { children: ReactNode; className?: string; width?: number }) {
+  return (
+    <section
+      className={cx('glass-strong flex flex-col items-start gap-[14px] overflow-clip rounded-[24px] p-[20px]', width ? 'shrink-0' : 'w-full', className)}
+      style={width ? { width } : undefined}
+    >
+      {children}
+    </section>
+  );
 }
 
 export const H3 = ({ children, className }: { children: ReactNode; className?: string }) => (

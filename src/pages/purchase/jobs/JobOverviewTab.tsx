@@ -28,7 +28,7 @@ import { ErrorState, errorBody } from '../../../ui/desktop/States';
 import { GapNote } from '../../../ui/desktop/Feedback';
 import { Avatar } from '../../../ui/desktop/Avatar';
 import { Ic, cx } from '../../../ui/desktop/Icon';
-import { enumLabel, formatDayTime, formatDuration } from '../../../lib/format';
+import { displayVersion, enumLabel, formatDayTime, formatDuration } from '../../../lib/format';
 import {
   formatWaiting, isOpen, useJobInspectionReport, useJobInspectionSessions, type InspectionReport, type InspectionSessions,
 } from './jobsData';
@@ -272,7 +272,7 @@ function HistoryCard({ job, verifiedById, engineerName, report, reportQ, session
     for (const v of report.versions) {
       if (v.submitted_at) {
         ev.push({
-          at: v.submitted_at, title: `Inspection report v${v.version_no} submitted`, actor: nameOf(v.engineer_id),
+          at: v.submitted_at, title: `Inspection report v${displayVersion(v.version_no)} submitted`, actor: nameOf(v.engineer_id),
           detail: v.outcome ? `Outcome ${enumLabel(v.outcome)}` : null, tone: 'progress',
         });
       }
@@ -281,7 +281,7 @@ function HistoryCard({ job, verifiedById, engineerName, report, reportQ, session
       const vno = report.versions.find((v) => v.id === r.version_id)?.version_no;
       ev.push({
         at: r.reviewed_at,
-        title: `Inspection report${vno ? ` v${vno}` : ''} ${r.review_decision === 'ACCEPT' ? 'accepted' : 'returned'}`,
+        title: `Inspection report${vno != null ? ` v${displayVersion(vno)}` : ''} ${r.review_decision === 'ACCEPT' ? 'accepted' : 'returned'}`,
         actor: nameOf(r.reviewer_id),
         detail: r.review_comment,
         tone: r.review_decision === 'ACCEPT' ? 'success' : 'neutral',
@@ -348,12 +348,12 @@ function NextStepCard({ job, report, loading, canAssign, onAssign }: {
     title = 'Waiting for the inspection report';
     detail = a.responded_at ? `Custody since ${formatDayTime(a.responded_at)}` : null;
   } else if (report.status === 'SUBMITTED') {
-    title = `Review inspection report v${latest.version_no}`;
+    title = `Review inspection report v${displayVersion(latest.version_no)}`;
     const wait = formatWaiting(latest.submitted_at);
     detail = [latest.outcome && `Outcome ${enumLabel(latest.outcome)}`, wait && `waiting ${wait}`].filter(Boolean).join(' · ');
     action = <ButtonLink to={`/p/jobs/${job.id}/inspection`} kind="primary" className="w-full" icon={<Ic icon={IconClipboardList} size={18} />}>Review report</ButtonLink>;
   } else if (report.status === 'ACCEPTED') {
-    title = `Inspection report v${latest.version_no} accepted`;
+    title = `Inspection report v${displayVersion(latest.version_no)} accepted`;
     detail = report.latest_outcome ? `Outcome ${enumLabel(report.latest_outcome)}` : null;
   } else {
     title = 'Waiting for a revised inspection report';

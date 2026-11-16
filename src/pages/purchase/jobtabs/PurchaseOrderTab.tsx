@@ -176,7 +176,7 @@ function PoView({ po }: { po: PurchaseOrder }) {
               </div>
             ))}
         </TabCard>
-        <TabCard className="w-[400px] shrink-0"><NextAction po={po} /></TabCard>
+        <TabCard width={400}><NextAction po={po} /></TabCard>
       </div>
     </>
   );
@@ -287,7 +287,7 @@ function RaisePo() {
             </>
           )}
       </TabCard>
-      <TabCard className="w-[400px] shrink-0">
+      <TabCard width={400}>
         <div className="flex w-full items-center overflow-clip"><h2 className={h2}>Raise PO</h2></div>
         <CompactField label="Payment terms" value={terms} onChange={(e) => setTerms(e.target.value)} helper="Optional — e.g. 30 days from invoice" />
         <div className="min-h-px w-px flex-1" />

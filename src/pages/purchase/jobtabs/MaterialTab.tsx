@@ -99,7 +99,7 @@ export function MaterialTab() {
           </section>
         ))}
 
-        <section className={`${card} min-h-px flex-1`}>
+        <section className={`${card} flex-[1_0_auto]`}>
           <div className="flex w-full items-center overflow-clip"><h2 className={h2}>Issued to engineer</h2></div>
           {matQ.isError ? (
             <ErrorState title="Couldn't load issued material" body={errorBody(matQ.error)} onRetry={() => matQ.refetch()} retrying={matQ.isFetching} />
@@ -125,9 +125,9 @@ export function MaterialTab() {
         </section>
       </div>
 
-      <div className="flex w-[420px] shrink-0 flex-col gap-[20px] overflow-clip">
+      <div className="flex w-[420px] shrink-0 flex-col gap-[20px]">
         <NextStep mrs={mrs} hasCheck={!!currentCheck} hasShortage={!!currentCheck?.lines.some((l) => Number(l.shortage_quantity) > 0)} reservations={resQ.data} issued={(matQ.data?.issues.length ?? 0) > 0} isPurchase={isPurchase} />
-        <section className={`${card} min-h-px flex-1`}>
+        <section className={`${card} flex-[1_0_auto]`}>
           <div className="flex w-full items-center overflow-clip"><h2 className={h2}>Reservations</h2></div>
           {!isPurchase ? (
             <p className="text-[14px] leading-[20px] text-fg-2">Reservations are visible to Purchase only.</p>
