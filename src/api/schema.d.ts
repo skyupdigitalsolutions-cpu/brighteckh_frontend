@@ -3743,6 +3743,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sales-supply/enquiries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Enquiry list (G-SS1): SE- enquiries with customer name, line / quote counts, latest quote
+         * @description Paginated: `page` (default 1), `page_size` (default 25, max 100). Company from the token. Filters: `status` (csv), `search` (enquiry no., customer name / code, details). Newest first.
+         */
+        get: operations["SalesSupplyDeskController_enquiries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales-supply/quotes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Quotation worklist (G-SS2): SQ- quotes by derived stage (TO_PRICE / ISSUED / WITH_CUSTOMER / ...) with latest-revision total
+         * @description Paginated: `page` (default 1), `page_size` (default 25, max 100). Company from the token. Filters: `stage` (csv), `search` (quote no., customer name / code, enquiry no.). Most recent activity first.
+         */
+        get: operations["SalesSupplyDeskController_quotes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales-supply/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sales Order list (G-SS3): customer, order total, line pipeline counts, pending authorisations / changes, advance state
+         * @description Paginated: `page` (default 1), `page_size` (default 25, max 100). Company from the token. Filters: `status` (csv), `search` (SO no., customer name / code, quote no., customer order ref). Newest first.
+         */
+        get: operations["SalesSupplyDeskController_orders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales-supply/outwards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Outward list (G-SS4): SOUT- outwards with customer, line pick / packing-evidence / delivery counts, latest tracking, orders
+         * @description Paginated: `page` (default 1), `page_size` (default 25, max 100). Company from the token. Filters: `status` (csv), `search` (SOUT no., customer name / code, tracking ref, SO no.). Newest first.
+         */
+        get: operations["SalesSupplyDeskController_outwards"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -11099,6 +11179,267 @@ export interface components {
             sales_order_number: string | null;
             /** @description Ordered by PO line_no */
             lines: components["schemas"]["StoresGrnLine"][];
+        };
+        SupplyEnquiryRow: {
+            /** Format: uuid */
+            customer_id: string;
+            /** @description customers.customer_name (not BR-10 masked: an operational screen, same as GET /lookups/customers) */
+            customer_name: string;
+            customer_code: string;
+            /** Format: uuid */
+            id: string;
+            /** @example SE-BLR-000012 */
+            enquiry_number: string;
+            /** @enum {string} */
+            enquiry_channel: "EMAIL" | "WHATSAPP" | "PHONE" | "WEBSITE" | "WALK_IN" | "REFERRAL" | "OTHER";
+            enquiry_details: string | null;
+            /** @enum {string} */
+            status: "RECEIVED" | "QUOTED" | "CANCELLED";
+            /** Format: uuid */
+            sales_owner_id: string | null;
+            /** @description employees.full_name of sales_owner_id */
+            sales_owner_name: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** @description br11_enquiry_lines */
+            line_count: number;
+            /** @description br11_sale_quotations raised from this enquiry */
+            quote_count: number;
+            /**
+             * Format: uuid
+             * @description newest quotation of this enquiry
+             */
+            latest_quote_id: string | null;
+            latest_quote_number: string | null;
+        };
+        SupplyEnquiryStatusCounts: {
+            RECEIVED: number;
+            QUOTED: number;
+            CANCELLED: number;
+        };
+        SupplyEnquiryPage: {
+            /** @description Rows matching the filters (all pages) */
+            total: number;
+            page: number;
+            page_size: number;
+            /** @description Newest first */
+            rows: components["schemas"]["SupplyEnquiryRow"][];
+            /** @description Per-status totals under `search` only (ignores `status`) */
+            counts_by_status: components["schemas"]["SupplyEnquiryStatusCounts"];
+        };
+        SupplyQuoteRow: {
+            /** Format: uuid */
+            customer_id: string;
+            /** @description customers.customer_name (not BR-10 masked: an operational screen, same as GET /lookups/customers) */
+            customer_name: string;
+            customer_code: string;
+            /**
+             * Format: uuid
+             * @description br11_sale_quotations.id (GET /sales-quotes/:id)
+             */
+            quote_id: string;
+            /** @example SQ-BLR-000007 */
+            quote_number: string;
+            /** Format: uuid */
+            enquiry_id: string;
+            enquiry_number: string;
+            /**
+             * Format: uuid
+             * @description LATEST br11_quote_revisions.id
+             */
+            latest_revision_id: string;
+            /** @description 0-based, as stored */
+            revision_no: number;
+            /** @description number of revisions */
+            revisions_count: number;
+            /** @enum {string} */
+            revision_status: "DRAFT" | "ISSUED" | "CANCELLED";
+            /**
+             * Format: date
+             * @description YYYY-MM-DD
+             */
+            validity_until: string | null;
+            /** @description lines on the latest revision */
+            line_count: number;
+            /**
+             * Format: int64
+             * @description Sum of line_total_paise on the latest revision (customer price, pre-tax) (paise, bigint string)
+             */
+            total_paise: string;
+            /** Format: date-time */
+            released_at: string | null;
+            /**
+             * Format: date-time
+             * @description newest br11_quote_dispatch_events.sent_at of the latest revision
+             */
+            last_sent_at: string | null;
+            /** @description channel of that dispatch event */
+            last_sent_channel: string | null;
+            /** @enum {string|null} */
+            latest_response_kind: "ENQUIRY" | "NEGOTIATING" | "ACCEPTED" | "PART_ACCEPTED" | "REJECTED" | "NO_RESPONSE" | null;
+            /** Format: date-time */
+            latest_response_at: string | null;
+            /** @description Sales Orders drafted from this quotation (any revision), excluding CANCELLED */
+            sales_order_count: number;
+            /**
+             * Format: date-time
+             * @description latest of revision created / released / sent / response
+             */
+            last_activity_at: string;
+            /**
+             * @description TO_PRICE = latest revision DRAFT (Purchase prices / issues it). CANCELLED = latest revision CANCELLED. For an ISSUED latest revision, from its newest customer response: ACCEPTED / PART_ACCEPTED / REJECTED = that response; ENQUIRY / NEGOTIATING / NO_RESPONSE = WITH_CUSTOMER; no response yet = WITH_CUSTOMER if the revision was sent (a dispatch event exists), else ISSUED.
+             * @enum {string}
+             */
+            stage: "TO_PRICE" | "ISSUED" | "WITH_CUSTOMER" | "ACCEPTED" | "PART_ACCEPTED" | "REJECTED" | "CANCELLED";
+        };
+        SupplyQuoteStageCounts: {
+            TO_PRICE: number;
+            ISSUED: number;
+            WITH_CUSTOMER: number;
+            ACCEPTED: number;
+            PART_ACCEPTED: number;
+            REJECTED: number;
+            CANCELLED: number;
+        };
+        SupplyQuotePage: {
+            /** @description Rows matching the filters (all pages) */
+            total: number;
+            page: number;
+            page_size: number;
+            /** @description last_activity_at descending, quote_number breaks ties */
+            rows: components["schemas"]["SupplyQuoteRow"][];
+            /** @description Per-stage totals under `search` only (ignores `stage`) */
+            counts_by_stage: components["schemas"]["SupplyQuoteStageCounts"];
+        };
+        SupplyOrderRow: {
+            /** Format: uuid */
+            customer_id: string;
+            /** @description customers.customer_name (not BR-10 masked: an operational screen, same as GET /lookups/customers) */
+            customer_name: string;
+            customer_code: string;
+            /**
+             * Format: uuid
+             * @description br11_sales_orders.id (GET /sales-orders/:id)
+             */
+            id: string;
+            /** @description SO-<CODE>-000001, assigned at verify; null while DRAFT */
+            sales_order_number: string | null;
+            /** @enum {string} */
+            status: "DRAFT" | "VERIFIED" | "PART_DELIVERED" | "DELIVERED" | "CANCELLED" | "CLOSED";
+            /** Format: uuid */
+            quote_id: string;
+            quote_number: string;
+            /** @description revision the order was drafted from */
+            quote_revision_no: number;
+            customer_order_reference: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            verified_at: string | null;
+            /** Format: date-time */
+            closed_at: string | null;
+            /**
+             * Format: int64
+             * @description Sum of round(accepted_qty x unit_price_paise) over the order lines (customer price, pre-tax) (paise, bigint string)
+             */
+            order_total_paise: string;
+            lines_total: number;
+            /** @description lines with reserved (CONFIRMED) + shipped >= accepted qty */
+            lines_reserved: number;
+            /** @description lines with shipped >= accepted qty */
+            lines_shipped: number;
+            /** @description lines with outstanding_delivery_qty <= 0 */
+            lines_delivered: number;
+            /** @description lines with invoiced >= accepted qty */
+            lines_invoiced: number;
+            /** @description authorisation evidence still PENDING verification */
+            pending_authorisations: number;
+            /** @description a br11_order_payment_conditions row exists (11B-02: required before reservation / sourcing) */
+            payment_terms_recorded: boolean;
+            /** @enum {string|null} */
+            advance_kind: "NOT_REQUIRED" | "FIXED_AMOUNT" | "PERCENTAGE" | "FULL" | null;
+            /** @description advance_kind NOT_REQUIRED, or Finance confirmed the advance (finance_confirmed_at set) */
+            advance_cleared: boolean;
+            /** @description change requests with decision PENDING */
+            open_change_requests: number;
+            /** @description outward batches carrying this order's lines, excluding CANCELLED */
+            outward_count: number;
+        };
+        SupplyOrderStatusCounts: {
+            DRAFT: number;
+            VERIFIED: number;
+            PART_DELIVERED: number;
+            DELIVERED: number;
+            CANCELLED: number;
+            CLOSED: number;
+        };
+        SupplyOrderPage: {
+            /** @description Rows matching the filters (all pages) */
+            total: number;
+            page: number;
+            page_size: number;
+            /** @description Newest first */
+            rows: components["schemas"]["SupplyOrderRow"][];
+            /** @description Per-status totals under `search` only (ignores `status`) */
+            counts_by_status: components["schemas"]["SupplyOrderStatusCounts"];
+        };
+        SupplyOutwardOrderRef: {
+            /** Format: uuid */
+            sales_order_id: string;
+            sales_order_number: string | null;
+        };
+        SupplyOutwardRow: {
+            /** Format: uuid */
+            customer_id: string;
+            /** @description customers.customer_name (not BR-10 masked: an operational screen, same as GET /lookups/customers) */
+            customer_name: string;
+            customer_code: string;
+            /**
+             * Format: uuid
+             * @description br11_outward_batches.id (GET /sales-outwards/:id)
+             */
+            id: string;
+            /** @description SOUT-<CODE>-000001, assigned at dispatch; null while DRAFT / CANCELLED before dispatch */
+            outward_number: string | null;
+            /** @enum {string} */
+            status: "DRAFT" | "DISPATCHED" | "CANCELLED";
+            /** @enum {string} */
+            dispatch_mode: "COURIER" | "CUSTOMER_PICKUP" | "OWN_TRANSPORT" | "OTHER";
+            carrier_name: string | null;
+            tracking_reference: string | null;
+            recipient_name: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            dispatched_at: string | null;
+            lines_total: number;
+            /** @description lines past DRAFT (PICKED / DISPATCHED / DELIVERED) */
+            lines_picked: number;
+            /** @description lines with >= 1 packing-evidence row (the dispatch photo gate) */
+            lines_with_packing_evidence: number;
+            /** @description lines with status DELIVERED */
+            lines_delivered: number;
+            /** @description newest tracking event status_note */
+            latest_tracking_note: string | null;
+            /** Format: date-time */
+            latest_tracking_at: string | null;
+            /** @description Sales Orders whose lines are on this outward */
+            sales_orders: components["schemas"]["SupplyOutwardOrderRef"][];
+        };
+        SupplyOutwardStatusCounts: {
+            DRAFT: number;
+            DISPATCHED: number;
+            CANCELLED: number;
+        };
+        SupplyOutwardPage: {
+            /** @description Rows matching the filters (all pages) */
+            total: number;
+            page: number;
+            page_size: number;
+            /** @description Newest first */
+            rows: components["schemas"]["SupplyOutwardRow"][];
+            /** @description Per-status totals under `search` only (ignores `status`) */
+            counts_by_status: components["schemas"]["SupplyOutwardStatusCounts"];
         };
     };
     responses: never;
@@ -25233,6 +25574,254 @@ export interface operations {
                 };
             };
             /** @description Requires role: STORES_QUALITY */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    SalesSupplyDeskController_enquiries: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Case-insensitive substring match (see each endpoint for the fields searched) */
+                search?: string;
+                /** @description Enquiry status (comma-separated; one or more of RECEIVED, QUOTED, CANCELLED). Omitted = all. */
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplyEnquiryPage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: SALES | PURCHASE | FINANCE | MANAGEMENT */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    SalesSupplyDeskController_quotes: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Case-insensitive substring match (see each endpoint for the fields searched) */
+                search?: string;
+                /** @description Derived stage (comma-separated; TO_PRICE, ISSUED, WITH_CUSTOMER, ACCEPTED, PART_ACCEPTED, REJECTED, CANCELLED). TO_PRICE = latest revision DRAFT (Purchase prices / issues it). CANCELLED = latest revision CANCELLED. For an ISSUED latest revision, from its newest customer response: ACCEPTED / PART_ACCEPTED / REJECTED = that response; ENQUIRY / NEGOTIATING / NO_RESPONSE = WITH_CUSTOMER; no response yet = WITH_CUSTOMER if the revision was sent (a dispatch event exists), else ISSUED. */
+                stage?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplyQuotePage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: SALES | PURCHASE | FINANCE | MANAGEMENT */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    SalesSupplyDeskController_orders: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Case-insensitive substring match (see each endpoint for the fields searched) */
+                search?: string;
+                /** @description Sales Order status (comma-separated; one or more of DRAFT, VERIFIED, PART_DELIVERED, DELIVERED, CANCELLED, CLOSED). Omitted = all. */
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplyOrderPage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: SALES | PURCHASE | FINANCE | MANAGEMENT */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    SalesSupplyDeskController_outwards: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Case-insensitive substring match (see each endpoint for the fields searched) */
+                search?: string;
+                /** @description Outward status (comma-separated; one or more of DRAFT, DISPATCHED, CANCELLED). Omitted = all. */
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SupplyOutwardPage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: SALES | PURCHASE | FINANCE | MANAGEMENT */
             403: {
                 headers: {
                     [name: string]: unknown;
