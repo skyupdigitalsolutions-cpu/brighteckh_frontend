@@ -23,6 +23,7 @@ import { JobQuoteTab } from './pages/purchase/quotes/JobQuoteTab';
 import { QuotesRoutes } from './pages/purchase/quotes/routes';
 import { SalesRoutes } from './pages/sales/routes';
 import { StoresRoutes } from './pages/stores/routes';
+import { AdminRoutes, ManagementRoutes } from './pages/mis/routes';
 import { MyJobsPage } from './pages/engineer/MyJobsPage';
 import { JobDetailPage } from './pages/engineer/JobDetailPage';
 import { InspectPage } from './pages/engineer/InspectPage';
@@ -113,6 +114,22 @@ export function App() {
             <Route path="/st" element={<RequireAuth><RoleGate roles={['STORES_QUALITY']} /></RequireAuth>}>
               <Route element={<DesktopShell />}>
                 {StoresRoutes}
+                <Route path="*" element={<NotBuiltPage />} />
+              </Route>
+            </Route>
+
+            {/* Management — BR-10 MIS (no Figma MIS frames; kit build). */}
+            <Route path="/mg" element={<RequireAuth><RoleGate roles={['MANAGEMENT']} /></RequireAuth>}>
+              <Route element={<DesktopShell />}>
+                {ManagementRoutes}
+                <Route path="*" element={<NotBuiltPage />} />
+              </Route>
+            </Route>
+
+            {/* SYSTEM_ADMIN — BR-10 RBAC admin (role bindings, report grants) + reports. */}
+            <Route path="/a" element={<RequireAuth><RoleGate roles={['SYSTEM_ADMIN']} /></RequireAuth>}>
+              <Route element={<DesktopShell />}>
+                {AdminRoutes}
                 <Route path="*" element={<NotBuiltPage />} />
               </Route>
             </Route>

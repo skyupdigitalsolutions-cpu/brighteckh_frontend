@@ -84,10 +84,16 @@ const purchaseOrder: Map<S<'PurchaseOrderDetail'>['po_status']> = {
 };
 const grn: Map<S<'StoresGrnRow'>['grn_status']> = { OPEN: 'neutral', PARTIAL: 'progress', POSTED: 'success' };
 
+// ---- BR-10 MIS. No Figma badge catalogue rows exist for these enums; tones follow the catalogue's semantics
+// (neutral = not started / inert, progress = moving, success = done, blocked = needs action / stopped).
+// INACTIVE binding / grant = created, awaiting activation or approval -> progress.
+const br10Status: Map<S<'Br10ReportGrantsRow'>['status']> = { INACTIVE: 'progress', ACTIVE: 'success', REVOKED: 'blocked' };
+const kpiStatus: Map<S<'ReportResponse'>['kpi_status']> = { DRAFT: 'neutral', VALIDATED: 'success' };
+
 export const TONES = {
   job, assignment, route, session, inspectionReport, reportVersion, outcome, materialRequest, changeRequest,
   itemStatus, repairReport, testResult, issue, slaState, reviewDecision, materialReturn, consumption,
-  receipt, unitVerification, dcException, rfq, offerTechnical, quote, shortage, invite, offer, purchaseOrder, grn,
+  receipt, unitVerification, dcException, rfq, offerTechnical, quote, shortage, invite, offer, purchaseOrder, grn, br10Status, kpiStatus,
 } as const;
 export type ToneDomain = keyof typeof TONES;
 

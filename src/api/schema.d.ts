@@ -2523,6 +2523,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/mis/companies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Legal entities (id, code, name): report `companies` scope and cross-company grant targets */
+        get: operations["Br10Controller_companies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mis/employees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Active employees of the caller company with the R_* roles each can be bound to (binding / grant pickers) */
+        get: operations["Br10Controller_employees"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/mis/role-bindings": {
         parameters: {
             query?: never;
@@ -2530,7 +2564,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Role bindings of the caller company with employee + actor names (INACTIVE first, then ACTIVE, REVOKED) */
+        get: operations["Br10Controller_listBindings"];
         put?: never;
         /** Bind an employee to an R_* role (must map to their existing role_code). Starts INACTIVE. */
         post: operations["Br10Controller_createBinding"];
@@ -2579,10 +2614,28 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** Grants where the caller company is the grantee or data-owner company, newest first, with names + approvals */
         get: operations["Br10Controller_listGrants"];
         put?: never;
         /** Create a named-employee grant (report + VIEW|EXPORT + company). Starts INACTIVE; required approvals derived by the DB. */
         post: operations["Br10Controller_createGrant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mis/report-grants/pending-my-approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** INACTIVE grants awaiting an approval the CALLER can give (same rules as the approval trigger), oldest first */
+        get: operations["Br10Controller_pendingMyApproval"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -8859,6 +8912,56 @@ export interface components {
             grants: components["schemas"]["Br10ReportGrantsRow"][];
             sales_customer_assignments: components["schemas"]["Br10SalesCustomerAssignmentsRow"][];
         };
+        Br10CompanyRow: {
+            /** Format: uuid */
+            id: string;
+            /** @example BLR */
+            entity_code: string;
+            name: string;
+        };
+        Br10EmployeeRow: {
+            /** Format: uuid */
+            id: string;
+            employee_code: string;
+            full_name: string;
+            /** @enum {string} */
+            role_code: "PURCHASE" | "ENGINEER" | "SALES" | "STORES_QUALITY" | "EXTERNAL_COORD" | "FINANCE" | "MANAGEMENT" | "SYSTEM_ADMIN";
+            /** @description R_* role codes whose maps_to_role_code is this employee's role_code (the only ones the DB lets you bind) */
+            bindable_role_codes: string[];
+        };
+        Br10BindingListRow: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            company_id: string;
+            /** Format: uuid */
+            employee_id: string;
+            role_code: string;
+            /** @enum {string} */
+            status: "INACTIVE" | "ACTIVE" | "REVOKED";
+            note: string | null;
+            /** Format: uuid */
+            created_by_id: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: uuid */
+            activated_by_id: string | null;
+            /** Format: date-time */
+            activated_at: string | null;
+            /** Format: uuid */
+            revoked_by_id: string | null;
+            /** Format: date-time */
+            revoked_at: string | null;
+            employee_code: string;
+            employee_name: string;
+            /** @enum {string} */
+            employee_role_code: "PURCHASE" | "ENGINEER" | "SALES" | "STORES_QUALITY" | "EXTERNAL_COORD" | "FINANCE" | "MANAGEMENT" | "SYSTEM_ADMIN";
+            employee_is_active: boolean;
+            /** @description employees.full_name of created_by_id */
+            created_by_name: string;
+            activated_by_name: string | null;
+            revoked_by_name: string | null;
+        };
         CreateBindingDto: {
             employee_id: string;
             /** @enum {string} */
@@ -8879,6 +8982,106 @@ export interface components {
             approver_role_code: string;
             /** Format: date-time */
             approved_at: string;
+        };
+        Br10GrantListRow: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            company_id: string;
+            /** Format: uuid */
+            employee_id: string;
+            report_code: string;
+            /** @enum {string} */
+            action: "VIEW" | "EXPORT";
+            /** Format: uuid */
+            target_company_id: string;
+            required_approvals: string[];
+            /** @enum {string} */
+            status: "INACTIVE" | "ACTIVE" | "REVOKED";
+            note: string | null;
+            /** Format: uuid */
+            created_by_id: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            activated_at: string | null;
+            /** Format: uuid */
+            revoked_by_id: string | null;
+            /** Format: date-time */
+            revoked_at: string | null;
+            approvals: components["schemas"]["Br10GrantApprovalsRow"][] | null;
+            /** @description employees.employee_code of the grantee */
+            employee_code: string;
+            /** @description employees.full_name of the grantee */
+            employee_name: string;
+            /** @description legal_entities.entity_code of target_company_id (the data owner) */
+            target_company_code: string;
+            /**
+             * @description br10_report_catalogue.data_class of report_code
+             * @enum {string}
+             */
+            data_class: "OPERATIONS" | "PROCUREMENT" | "MARGIN_PROFIT" | "RECEIVABLES" | "RECEIVABLE_STATUS" | "ENGINEER_PERFORMANCE" | "AUDIT" | "CONFIG" | "PII_CUSTOMER";
+        };
+        Br10PendingApprovalRow: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            company_id: string;
+            /** Format: uuid */
+            employee_id: string;
+            report_code: string;
+            /** @enum {string} */
+            action: "VIEW" | "EXPORT";
+            /** Format: uuid */
+            target_company_id: string;
+            required_approvals: string[];
+            /** @enum {string} */
+            status: "INACTIVE" | "ACTIVE" | "REVOKED";
+            note: string | null;
+            /** Format: uuid */
+            created_by_id: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            activated_at: string | null;
+            /** Format: uuid */
+            revoked_by_id: string | null;
+            /** Format: date-time */
+            revoked_at: string | null;
+            approvals: components["schemas"]["Br10GrantApprovalsRow"][] | null;
+            /** @description employees.employee_code of the grantee */
+            employee_code: string;
+            /** @description employees.full_name of the grantee */
+            employee_name: string;
+            /** @description legal_entities.entity_code of target_company_id (the data owner) */
+            target_company_code: string;
+            /**
+             * @description br10_report_catalogue.data_class of report_code
+             * @enum {string}
+             */
+            data_class: "OPERATIONS" | "PROCUREMENT" | "MARGIN_PROFIT" | "RECEIVABLES" | "RECEIVABLE_STATUS" | "ENGINEER_PERFORMANCE" | "AUDIT" | "CONFIG" | "PII_CUSTOMER";
+            /** @description Approval kinds the CALLER can record on this grant right now (same rules as the br10_guard_approval trigger): required, not yet recorded, caller is not the grantee and has not already approved it; STANDARD = SYSTEM_ADMIN of the grantee company; FINANCIAL / CROSS_COMPANY = the configured authoriser role of the data-owner company (FINANCIAL never SYSTEM_ADMIN). Never empty in this list. */
+            can_approve_kinds: ("STANDARD" | "FINANCIAL" | "CROSS_COMPANY")[];
+        };
+        CreateGrantDto: {
+            employee_id: string;
+            /**
+             * @description PII_CUSTOMER = entitlement to see customer name/GSTIN unmasked (VIEW on screen, EXPORT in exports)
+             * @enum {string}
+             */
+            report_code: "SERVICE_PIPELINE" | "QUALITY_WARRANTY" | "SLA_MONITOR" | "PROCUREMENT_SUMMARY" | "INVENTORY_POSITION" | "RECEIVABLES_AGING" | "RECEIVABLE_STATUS" | "JOB_PROFITABILITY" | "ENGINEER_PERFORMANCE" | "ACCESS_AUDIT" | "PII_CUSTOMER";
+            /**
+             * @description VIEW and EXPORT are separate grants
+             * @enum {string}
+             */
+            action: "VIEW" | "EXPORT";
+            /** @description Data-owner company (default: the employee's own). Different = cross-company grant. */
+            target_company_id?: string;
+            note?: string;
+        };
+        ApproveGrantDto: {
+            /** @enum {string} */
+            approval_kind: "STANDARD" | "FINANCIAL" | "CROSS_COMPANY";
         };
         GrantWithApprovals: {
             /** Format: uuid */
@@ -8907,26 +9110,6 @@ export interface components {
             /** Format: date-time */
             revoked_at: string | null;
             approvals: components["schemas"]["Br10GrantApprovalsRow"][] | null;
-        };
-        CreateGrantDto: {
-            employee_id: string;
-            /**
-             * @description PII_CUSTOMER = entitlement to see customer name/GSTIN unmasked (VIEW on screen, EXPORT in exports)
-             * @enum {string}
-             */
-            report_code: "SERVICE_PIPELINE" | "QUALITY_WARRANTY" | "SLA_MONITOR" | "PROCUREMENT_SUMMARY" | "INVENTORY_POSITION" | "RECEIVABLES_AGING" | "RECEIVABLE_STATUS" | "JOB_PROFITABILITY" | "ENGINEER_PERFORMANCE" | "ACCESS_AUDIT" | "PII_CUSTOMER";
-            /**
-             * @description VIEW and EXPORT are separate grants
-             * @enum {string}
-             */
-            action: "VIEW" | "EXPORT";
-            /** @description Data-owner company (default: the employee's own). Different = cross-company grant. */
-            target_company_id?: string;
-            note?: string;
-        };
-        ApproveGrantDto: {
-            /** @enum {string} */
-            approval_kind: "STANDARD" | "FINANCIAL" | "CROSS_COMPANY";
         };
         CreateSalesAssignmentDto: {
             employee_id: string;
@@ -20925,6 +21108,162 @@ export interface operations {
             };
         };
     };
+    Br10Controller_companies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Br10CompanyRow"][];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Br10Controller_employees: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Br10EmployeeRow"][];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: SYSTEM_ADMIN */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Br10Controller_listBindings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Br10BindingListRow"][];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: SYSTEM_ADMIN */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     Br10Controller_createBinding: {
         parameters: {
             query?: never;
@@ -21112,7 +21451,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["GrantWithApprovals"][];
+                    "application/json": components["schemas"]["Br10GrantListRow"][];
                 };
             };
             /** @description Validation or business-rule failure (including a malformed :id) */
@@ -21194,6 +21533,52 @@ export interface operations {
             };
             /** @description Requires role: SYSTEM_ADMIN */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    Br10Controller_pendingMyApproval: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Br10PendingApprovalRow"][];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

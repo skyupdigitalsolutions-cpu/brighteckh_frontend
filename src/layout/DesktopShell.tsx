@@ -16,6 +16,7 @@ import { IconBell, IconBuildingFactory2, IconMoon, IconSearch, IconSun, IconTool
 import type { Role } from '../api/types';
 import { useAuth, useMe } from '../auth/AuthProvider';
 import { homeFor, isNavActive, navFor, ROLE_LABEL } from '../auth/access';
+import { useIsBr10Authoriser } from '../pages/mis/api';
 import { Ic, cx } from '../ui/desktop/Icon';
 import { IconButton } from '../ui/desktop/Button';
 import { EmptyState, StateCard } from '../ui/desktop/States';
@@ -80,7 +81,8 @@ function ThemeToggle() {
 function TopNav() {
   const me = useMe();
   const loc = useLocation();
-  const items = navFor(me.role);
+  const authoriser = useIsBr10Authoriser(me.role, navFor(me.role).some((i) => i.gate === 'br10Authoriser'));
+  const items = navFor(me.role).filter((i) => i.gate !== 'br10Authoriser' || authoriser);
   const notif = useAnchor<HTMLButtonElement>();
   const search = useAnchor<HTMLButtonElement>();
 

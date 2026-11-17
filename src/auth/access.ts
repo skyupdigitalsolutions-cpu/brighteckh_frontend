@@ -7,7 +7,11 @@ import type { Role } from '../api/types';
  * `to` = pill target. The pill is active when the path equals `to` (`end`) or starts with `to` or any `match`
  * prefix — e.g. the Sourcing pill stays active on /p/rfqs/:id.
  */
-export type NavItem = { to: string; label: string; built: boolean; end?: boolean; match?: string[] };
+export type NavItem = {
+  to: string; label: string; built: boolean; end?: boolean; match?: string[];
+  /** Data-driven visibility: 'br10Authoriser' = only when GET /mis/authorities names the caller's role as an authoriser. */
+  gate?: 'br10Authoriser';
+};
 
 // Purchase labels are the Figma "Shell / Top nav · Purchase" pills (177:102545), routed under /p.
 // Other roles follow the "Who sees what" matrix (00 · Foundations) and are not built yet (/m).
@@ -41,16 +45,28 @@ const NAV: Record<Role, NavItem[]> = {
     { to: '/st/quarantine', label: 'Quarantine', built: false },
     { to: '/st/inventory', label: 'Inventory', built: false },
   ],
+  // BR-10 MIS under /mg (no Figma frames; kit build). The Figma "Shell / Top nav · Management" pills (M-D panel
+  // 177:140121: Overview, Jobs, Quotes, Purchase orders, Inventory, Masters) follow, not built yet.
   MANAGEMENT: [
-    { to: '/m/jobs', label: 'Jobs', built: false },
-    { to: '/m/quotes', label: 'Quotes', built: false },
-    { to: '/m/orders', label: 'Orders', built: false },
-    { to: '/m/inventory', label: 'Inventory', built: false },
-    { to: '/m/mis', label: 'MIS', built: false },
+    { to: '/mg', label: 'Reports', built: true, end: true, match: ['/mg/reports'] },
+    { to: '/mg/approvals', label: 'Approvals', built: true, gate: 'br10Authoriser' },
+    { to: '/mg/access', label: 'My access', built: true },
+    { to: '/mg/overview', label: 'Overview', built: false },
+    { to: '/mg/jobs', label: 'Jobs', built: false },
+    { to: '/mg/quotes', label: 'Quotes', built: false },
+    { to: '/mg/orders', label: 'Purchase orders', built: false },
+    { to: '/mg/inventory', label: 'Inventory', built: false },
+    { to: '/mg/masters', label: 'Masters', built: false },
   ],
   // G7 in Figma open questions: out of the design scope so far.
   FINANCE: [],
-  SYSTEM_ADMIN: [],
+  // BR-10 RBAC admin under /a (no Figma frames; kit build).
+  SYSTEM_ADMIN: [
+    { to: '/a', label: 'Role bindings', built: true, end: true },
+    { to: '/a/grants', label: 'Report grants', built: true },
+    { to: '/a/reports', label: 'Reports', built: true },
+    { to: '/a/access', label: 'My access', built: true },
+  ],
   EXTERNAL_COORD: [],
 };
 
@@ -75,6 +91,8 @@ export const can = {
   salesWork: (r: Role) => r === 'SALES',
   /** BR-06 GRN create / line photo / line post + GET /stores/*: @Roles('STORES_QUALITY'). */
   storesWork: (r: Role) => r === 'STORES_QUALITY',
+  /** BR-10 role bindings + report grants (create / activate / revoke, STANDARD approval): @Roles('SYSTEM_ADMIN'). */
+  misAdmin: (r: Role) => r === 'SYSTEM_ADMIN',
 };
 
 export const ROLE_LABEL: Record<Role, string> = {
