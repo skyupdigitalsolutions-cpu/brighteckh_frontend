@@ -24,6 +24,10 @@ import { QuotesRoutes } from './pages/purchase/quotes/routes';
 import { SalesRoutes } from './pages/sales/routes';
 import { StoresRoutes } from './pages/stores/routes';
 import { AdminRoutes, ManagementRoutes } from './pages/mis/routes';
+import { PurchaseQuoteRoutes, SalesEnquiryQuoteRoutes } from './pages/supply/quote/routes';
+import { PurchaseOrderRoutes, SalesOrderRoutes } from './pages/supply/order/routes';
+import { FinanceInvoiceRoutes, PurchaseOutwardRoutes } from './pages/supply/outward/routes';
+import { AdminSalesPolicyRoutes, FinanceAdvanceRoutes } from './pages/supply/finance-admin/routes';
 import { MyJobsPage } from './pages/engineer/MyJobsPage';
 import { JobDetailPage } from './pages/engineer/JobDetailPage';
 import { InspectPage } from './pages/engineer/InspectPage';
@@ -98,6 +102,13 @@ export function App() {
                 <Route path="sourcing">{SourcingRoutes}</Route>
                 <Route path="rfqs">{RfqRoutes}</Route>
                 <Route path="quotes">{QuotesRoutes}</Route>
+                {/* BR-11 Sales & Supply (PS-D 238:41629). */}
+                <Route path="supply">
+                  <Route index element={<Navigate to="quotes" replace />} />
+                  {PurchaseQuoteRoutes}
+                  {PurchaseOrderRoutes}
+                  {PurchaseOutwardRoutes}
+                </Route>
                 <Route path="*" element={<NotBuiltPage />} />
               </Route>
             </Route>
@@ -106,6 +117,9 @@ export function App() {
             <Route path="/s" element={<RequireAuth><RoleGate roles={['SALES']} /></RequireAuth>}>
               <Route element={<DesktopShell />}>
                 {SalesRoutes}
+                {/* BR-11 product sales (SS-D 237:40367). */}
+                {SalesEnquiryQuoteRoutes}
+                {SalesOrderRoutes}
                 <Route path="*" element={<NotBuiltPage />} />
               </Route>
             </Route>
@@ -130,6 +144,16 @@ export function App() {
             <Route path="/a" element={<RequireAuth><RoleGate roles={['SYSTEM_ADMIN']} /></RequireAuth>}>
               <Route element={<DesktopShell />}>
                 {AdminRoutes}
+                {AdminSalesPolicyRoutes}
+                <Route path="*" element={<NotBuiltPage />} />
+              </Route>
+            </Route>
+
+            {/* Finance — BR-11 product invoices + advances (F-D 247:51039). */}
+            <Route path="/f" element={<RequireAuth><RoleGate roles={['FINANCE']} /></RequireAuth>}>
+              <Route element={<DesktopShell />}>
+                {FinanceInvoiceRoutes}
+                {FinanceAdvanceRoutes}
                 <Route path="*" element={<NotBuiltPage />} />
               </Route>
             </Route>

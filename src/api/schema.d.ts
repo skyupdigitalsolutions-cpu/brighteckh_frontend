@@ -1924,7 +1924,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Payment receipts (paginated), optionally for one customer: unallocated amount + remaining BR-11 advance coverage
+         * @description Paginated: `page`, `page_size` (max 100). `customer_id` filters; `search` matches reference, customer, mode. Newest received first. Used by the Finance advance confirmation picker (POST /sales-orders/:id/payment-terms/confirm-advance).
+         */
+        get: operations["Br08Controller_listReceipts"];
         put?: never;
         /** Record a payment receipt and (optionally) allocate it to invoices. Partial payments supported. */
         post: operations["Br08Controller_recordPayment"];
@@ -3792,9 +3796,29 @@ export interface paths {
         };
         /**
          * Sales Order list (G-SS3): customer, order total, line pipeline counts, pending authorisations / changes, advance state
-         * @description Paginated: `page` (default 1), `page_size` (default 25, max 100). Company from the token. Filters: `status` (csv), `search` (SO no., customer name / code, quote no., customer order ref). Newest first.
+         * @description Paginated: `page` (default 1), `page_size` (default 25, max 100). Company from the token. Filters: `status` (csv), `advance_pending` (true = Finance advances queue), `search` (SO no., customer name / code, quote no., customer order ref). Newest first.
          */
         get: operations["SalesSupplyDeskController_orders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sales-supply/invoice-queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Product-invoice queue (G-SS5): orders with un-invoiced value, READY / WAITING / BLOCKED under the configured trigger
+         * @description Paginated: `page` (default 1), `page_size` (default 25, max 100). Company from the token. Filters: `readiness` (csv), `search` (SO no., customer name / code). `config` echoes the trigger and GST-rate gate. Readiness mirrors br08_build_sales_invoice (same checks, same per-line invoiceable quantity); item-level checks surface only in POST /sales-invoices/preview. READY first.
+         */
+        get: operations["SalesSupplyDeskController_invoiceQueue"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8026,6 +8050,62 @@ export interface components {
             /** @description Negative allocations returning paid amounts to their receipts */
             payment_reversals: components["schemas"]["Br08PaymentAllocationsRow"][];
         };
+        PaymentReceiptListRow: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            company_id: string;
+            /** Format: uuid */
+            customer_id: string;
+            /**
+             * Format: int64
+             * @description bigint, returned as string
+             */
+            amount_paise: string;
+            /**
+             * Format: date-time
+             * @description date column, serialised as ISO timestamp
+             */
+            received_on: string;
+            payment_mode: string;
+            payment_reference: string | null;
+            remarks: string | null;
+            /**
+             * Format: int64
+             * @description bigint, returned as string
+             */
+            allocated_paise: string;
+            /** Format: uuid */
+            recorded_by_id: string;
+            /** Format: date-time */
+            recorded_at: string;
+            customer_name: string;
+            customer_code: string;
+            /** @description employees.full_name of recorded_by_id */
+            recorded_by_name: string | null;
+            /**
+             * Format: int64
+             * @description amount_paise - allocated_paise (not yet allocated to invoices)
+             */
+            unallocated_paise: string;
+            /**
+             * Format: int64
+             * @description sum of BR-11 advances (required_amount_paise) already confirmed against this receipt
+             */
+            advance_backed_paise: string;
+            /**
+             * Format: int64
+             * @description amount_paise - advance_backed_paise: what a further BR-11 advance confirmation can still count (br11_guard_payment_condition rule)
+             */
+            available_for_advance_paise: string;
+        };
+        PaymentReceiptListPage: {
+            /** @description received_on descending, newest recorded first */
+            rows: components["schemas"]["PaymentReceiptListRow"][];
+            total: number;
+            page: number;
+            page_size: number;
+        };
         AllocationLineDto: {
             invoice_id: string;
             /**
@@ -11360,6 +11440,28 @@ export interface components {
             advance_kind: "NOT_REQUIRED" | "FIXED_AMOUNT" | "PERCENTAGE" | "FULL" | null;
             /** @description advance_kind NOT_REQUIRED, or Finance confirmed the advance (finance_confirmed_at set) */
             advance_cleared: boolean;
+            /**
+             * Format: int64
+             * @description required advance (paise); null when NOT_REQUIRED or no terms
+             */
+            advance_required_amount_paise: string | null;
+            /**
+             * Format: decimal
+             * @description required_percent (PERCENTAGE terms only)
+             */
+            advance_required_percent: string | null;
+            /**
+             * Format: date-time
+             * @description when Purchase recorded the payment terms
+             */
+            payment_terms_recorded_at: string | null;
+            /** @description employees.full_name of the recorder */
+            payment_terms_recorded_by_name: string | null;
+            /**
+             * Format: date-time
+             * @description when Finance confirmed the advance
+             */
+            advance_confirmed_at: string | null;
             /** @description change requests with decision PENDING */
             open_change_requests: number;
             /** @description outward batches carrying this order's lines, excluding CANCELLED */
@@ -11382,6 +11484,83 @@ export interface components {
             rows: components["schemas"]["SupplyOrderRow"][];
             /** @description Per-status totals under `search` only (ignores `status`) */
             counts_by_status: components["schemas"]["SupplyOrderStatusCounts"];
+        };
+        InvoiceQueueConfig: {
+            /**
+             * @description br11_company_policies.invoice_trigger (CLIENT-UNCONFIRMED)
+             * @enum {string|null}
+             */
+            invoice_trigger: "ADVANCE" | "DISPATCH" | "DELIVERY" | "MILESTONE" | null;
+            /** @description an active br08_gst_rate_config row with quote_line_type PRODUCT_SALE exists (P-12) */
+            product_gst_rate_configured: boolean;
+            /** @description true while either is missing (or the trigger is MILESTONE): every row is BLOCKED */
+            blocked: boolean;
+        };
+        InvoiceQueueRow: {
+            /** Format: uuid */
+            customer_id: string;
+            /** @description customers.customer_name (not BR-10 masked: an operational screen, same as GET /lookups/customers) */
+            customer_name: string;
+            customer_code: string;
+            /** Format: uuid */
+            sales_order_id: string;
+            sales_order_number: string;
+            /** @enum {string} */
+            order_status: "VERIFIED" | "PART_DELIVERED" | "DELIVERED";
+            /** @description customers.state_code */
+            customer_state_code: string | null;
+            /**
+             * @description customer state vs company state; null if either is missing
+             * @enum {string|null}
+             */
+            tax_regime: "INTRA_STATE" | "INTER_STATE" | null;
+            /**
+             * Format: int64
+             * @description Taxable value invoiceable under the trigger: sum of round(remaining invoiceable qty x unit price). 0 when the config gate is closed; for a customer- or profile-BLOCKED row it is what becomes invoiceable once unblocked (paise, bigint string)
+             */
+            invoiceable_taxable_paise: string;
+            /**
+             * Format: int64
+             * @description Not-yet-invoiced value of the whole order: sum of round((accepted - invoiced) x unit price) over live lines (paise, bigint string)
+             */
+            uninvoiced_taxable_paise: string;
+            lines_total: number;
+            /** @description lines with invoiceable quantity left now */
+            lines_invoiceable: number;
+            /** @description live (not CANCELLED) BR-08 invoices on this order */
+            invoices_count: number;
+            /**
+             * @description Newest event that makes quantity invoiceable under the trigger (ADVANCE / DISPATCH / DELIVERY); null if none yet
+             * @enum {string|null}
+             */
+            trigger_event_kind: "ADVANCE_CONFIRMED" | "DISPATCHED" | "DELIVERED" | null;
+            /** @description SOUT number for DISPATCHED / DELIVERED events */
+            trigger_event_ref: string | null;
+            /** Format: date-time */
+            trigger_event_at: string | null;
+            /**
+             * @description READY = at least one line has invoiceable quantity left under the configured trigger (br11_line_invoiceable_qty - br11_line_invoiced_qty > 0). WAITING = nothing invoiceable yet (e.g. not dispatched / delivered). BLOCKED = the server would refuse an invoice now: trigger unset or MILESTONE, no active PRODUCT_SALE GST rate, customer not APPROVED, or customer GSTIN / state missing (blocked_reason says which).
+             * @enum {string}
+             */
+            readiness: "READY" | "WAITING" | "BLOCKED";
+            /** @description why BLOCKED (server wording); null otherwise */
+            blocked_reason: string | null;
+        };
+        InvoiceQueueCounts: {
+            READY: number;
+            WAITING: number;
+            BLOCKED: number;
+        };
+        InvoiceQueuePage: {
+            /** @description Rows matching the filters (all pages) */
+            total: number;
+            page: number;
+            page_size: number;
+            config: components["schemas"]["InvoiceQueueConfig"];
+            /** @description READY first, then WAITING, then BLOCKED; newest trigger event first */
+            rows: components["schemas"]["InvoiceQueueRow"][];
+            /** @description Per-readiness totals under `search` only */
+            counts_by_readiness: components["schemas"]["InvoiceQueueCounts"];
         };
         SupplyOutwardOrderRef: {
             /** Format: uuid */
@@ -19350,6 +19529,68 @@ export interface operations {
             };
         };
     };
+    Br08Controller_listReceipts: {
+        parameters: {
+            query?: {
+                /** @description Only this customer (the advance picker passes the customer of the order) */
+                customer_id?: string;
+                page?: number;
+                page_size?: number;
+                /** @description payment_reference, customer name / code, payment mode */
+                search?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentReceiptListPage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: FINANCE | MANAGEMENT */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     Br08Controller_recordPayment: {
         parameters: {
             query?: never;
@@ -25726,6 +25967,8 @@ export interface operations {
                 search?: string;
                 /** @description Sales Order status (comma-separated; one or more of DRAFT, VERIFIED, PART_DELIVERED, DELIVERED, CANCELLED, CLOSED). Omitted = all. */
                 status?: string;
+                /** @description true = only orders whose recorded terms require an advance that Finance has not confirmed yet (the Finance advances queue); false = only orders without such a pending advance. Omitted = all. */
+                advance_pending?: boolean;
             };
             header?: never;
             path?: never;
@@ -25760,6 +26003,68 @@ export interface operations {
                 };
             };
             /** @description Requires role: SALES | PURCHASE | FINANCE | MANAGEMENT */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    SalesSupplyDeskController_invoiceQueue: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Case-insensitive substring match (see each endpoint for the fields searched) */
+                search?: string;
+                /** @description Readiness (comma-separated; READY, WAITING, BLOCKED). READY = at least one line has invoiceable quantity left under the configured trigger (br11_line_invoiceable_qty - br11_line_invoiced_qty > 0). WAITING = nothing invoiceable yet (e.g. not dispatched / delivered). BLOCKED = the server would refuse an invoice now: trigger unset or MILESTONE, no active PRODUCT_SALE GST rate, customer not APPROVED, or customer GSTIN / state missing (blocked_reason says which). */
+                readiness?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceQueuePage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: FINANCE | MANAGEMENT */
             403: {
                 headers: {
                     [name: string]: unknown;

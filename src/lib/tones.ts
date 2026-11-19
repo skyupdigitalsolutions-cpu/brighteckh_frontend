@@ -90,10 +90,39 @@ const grn: Map<S<'StoresGrnRow'>['grn_status']> = { OPEN: 'neutral', PARTIAL: 'p
 const br10Status: Map<S<'Br10ReportGrantsRow'>['status']> = { INACTIVE: 'progress', ACTIVE: 'success', REVOKED: 'blocked' };
 const kpiStatus: Map<S<'ReportResponse'>['kpi_status']> = { DRAFT: 'neutral', VALIDATED: 'success' };
 
+// ---- BR-11 Sales & Supply. No catalogue rows were added for these enums (Badge catalogue 3:22 unchanged), so tones follow
+// the badges drawn in the BR-11 frames (e.g. PQ0 238:41630 stage column: TO PRICE neutral, ISSUED / WITH CUSTOMER progress,
+// ACCEPTED / PART ACCEPTED success, REJECTED / CANCELLED blocked; PO2 243:49148 reservation CONFIRMED success, FAILED
+// blocked, authorisation VERIFIED success; POUT1 246:51277 line PICKED progress; FI0 247:51290 READY progress, WAITING neutral).
+const supplyEnquiry: Map<S<'EnquiryDetail'>['status']> = { RECEIVED: 'progress', QUOTED: 'success', CANCELLED: 'blocked' };
+const supplyQuoteStage: Map<S<'SupplyQuoteRow'>['stage']> = {
+  TO_PRICE: 'neutral', ISSUED: 'progress', WITH_CUSTOMER: 'progress', ACCEPTED: 'success', PART_ACCEPTED: 'success',
+  REJECTED: 'blocked', CANCELLED: 'blocked',
+};
+const supplyRevision: Map<S<'QuoteRevisionDetail'>['revision_status']> = { DRAFT: 'neutral', ISSUED: 'progress', CANCELLED: 'blocked' };
+const supplyResponse: Map<S<'Br11CustomerQuoteResponsesRow'>['response_kind']> = {
+  ENQUIRY: 'neutral', NEGOTIATING: 'progress', ACCEPTED: 'success', PART_ACCEPTED: 'success', REJECTED: 'blocked', NO_RESPONSE: 'neutral',
+};
+const supplyOrder: Map<S<'SalesOrderDetail'>['status']> = {
+  DRAFT: 'neutral', VERIFIED: 'progress', PART_DELIVERED: 'progress', DELIVERED: 'success', CLOSED: 'success', CANCELLED: 'blocked',
+};
+const supplyAuthorisation: Map<S<'Br11OrderAuthorisationEventsRow'>['verified_status']> = { PENDING: 'neutral', VERIFIED: 'success', REJECTED: 'blocked' };
+const supplyReservation: Map<S<'Br11InventoryReservationRequestsRow'>['state']> = {
+  REQUESTED: 'progress', CONFIRMED: 'success', FAILED: 'blocked', RELEASED: 'neutral', CONSUMED: 'neutral',
+};
+const supplyChange: Map<S<'Br11SalesChangeRequestsRow'>['decision']> = { PENDING: 'progress', APPROVED: 'success', REJECTED: 'blocked' };
+const supplyOutward: Map<S<'OutwardDetail'>['status']> = { DRAFT: 'neutral', DISPATCHED: 'progress', CANCELLED: 'blocked' };
+const supplyOutwardLine: Map<S<'OutwardLineDetail'>['status']> = { DRAFT: 'neutral', PICKED: 'progress', DISPATCHED: 'progress', DELIVERED: 'success' };
+const supplyDelivery: Map<S<'Br11DeliveryEvidenceRow'>['delivery_status']> = { DELIVERED: 'success', FAILED: 'blocked', DAMAGED: 'blocked' };
+const invoiceReadiness: Map<S<'InvoiceQueueRow'>['readiness']> = { READY: 'progress', WAITING: 'neutral', BLOCKED: 'blocked' };
+const invoiceStatus: Map<S<'InvoiceDetail'>['invoice_status']> = { ISSUED: 'progress', PARTIALLY_PAID: 'progress', PAID: 'success', CANCELLED: 'blocked' };
+
 export const TONES = {
   job, assignment, route, session, inspectionReport, reportVersion, outcome, materialRequest, changeRequest,
   itemStatus, repairReport, testResult, issue, slaState, reviewDecision, materialReturn, consumption,
   receipt, unitVerification, dcException, rfq, offerTechnical, quote, shortage, invite, offer, purchaseOrder, grn, br10Status, kpiStatus,
+  supplyEnquiry, supplyQuoteStage, supplyRevision, supplyResponse, supplyOrder, supplyAuthorisation, supplyReservation, supplyChange,
+  supplyOutward, supplyOutwardLine, supplyDelivery, invoiceReadiness, invoiceStatus,
 } as const;
 export type ToneDomain = keyof typeof TONES;
 
