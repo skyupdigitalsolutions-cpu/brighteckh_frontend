@@ -26,9 +26,9 @@ const NAV: Record<Role, NavItem[]> = {
     { to: '/p/requests', label: 'Requests', built: true },
     { to: '/p/sourcing', label: 'Sourcing', built: true, match: ['/p/rfqs'] },
     { to: '/p/quotes', label: 'Quotes', built: true },
-    // Not built: SUPPLIER purchase orders (BR-06) list — Figma 03g "Purchase · Orders" / O0 177:125758. Not the BR-11
-    // sales orders (those are under Sales & Supply). No company-wide PO list endpoint for Purchase exists yet.
-    { to: '/p/orders', label: 'Orders', built: false },
+    // SUPPLIER purchase orders (BR-06) register + PO page — Figma 03g "Purchase · Orders" / O0 177:125758 (GET /purchase-orders,
+    // PURCHASE only). Not the BR-11 sales orders (those are under Sales & Supply).
+    { to: '/p/orders', label: 'Orders', built: true },
     // BR-11 (PS-D 238:41629 top nav): "Sales & Supply" (sub-tabs Quotes to price · Orders · Outwards) and "Stock" (merged
     // Inventory + Masters: Availability · Journal · Items · Assemblies, not built yet).
     { to: '/p/supply', label: 'Sales & Supply', built: true },

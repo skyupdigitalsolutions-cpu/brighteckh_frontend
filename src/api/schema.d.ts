@@ -1195,7 +1195,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Supplier PO with lines */
+        /** Supplier PO with lines (+ item code/name, received qty), acknowledgement, shipments, GRN summaries, names */
         get: operations["Br06Controller_getPo"];
         put?: never;
         post?: never;
@@ -3867,6 +3867,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/purchase-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Supplier PO register: company POs (repair + sales order) with job/SO, customer, value, ack, shipment, GRNs
+         * @description Paginated: `page` (default 1), `page_size` (default 25, max 100) -> { rows, total, page, page_size, counts_by_status }. Filters: `status`, `purpose` (comma-separated DB values), `job_id`, `sales_order_id`, `supplier_id`, `search` (PO number, supplier, job number, sales order number, ack supplier reference, shipment AWB/LR). `counts_by_status` covers company + `search` only. Newest first. No offer / sourcing / sell-price data.
+         */
+        get: operations["PurchaseOrdersDeskController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -6320,6 +6340,169 @@ export interface components {
             sales_order_id: string | null;
             /** Format: uuid */
             supplier_id: string | null;
+        };
+        PurchaseOrderAcknowledgement: {
+            supplier_reference: string | null;
+            /**
+             * Format: date
+             * @description YYYY-MM-DD
+             */
+            expected_delivery_date: string | null;
+            notes: string | null;
+            /**
+             * Format: date-time
+             * @description Server time of the acknowledge call (not an input)
+             */
+            acknowledged_at: string;
+            /** Format: uuid */
+            recorded_by_id: string;
+            recorded_by_name: string;
+        };
+        PurchaseOrderShipment: {
+            /** Format: uuid */
+            id: string;
+            carrier: string | null;
+            awb_or_lr_number: string | null;
+            /**
+             * Format: date
+             * @description YYYY-MM-DD
+             */
+            expected_arrival_date: string | null;
+            notes: string | null;
+            /**
+             * Format: date-time
+             * @description Server time of the shipment call (not an input)
+             */
+            shipped_at: string;
+            /** Format: uuid */
+            recorded_by_id: string;
+            recorded_by_name: string;
+        };
+        PurchaseOrderGrnSummary: {
+            /** Format: uuid */
+            grn_id: string;
+            grn_number: string;
+            /** Format: date-time */
+            received_at: string;
+            /** Format: uuid */
+            received_by_id: string;
+            received_by_name: string;
+            lines_total: number;
+            /** @description lines with posted_at set */
+            lines_posted: number;
+            /**
+             * Format: decimal
+             * @description Sum of received_quantity (all lines) (numeric, returned as decimal string)
+             */
+            received_quantity: string;
+            /**
+             * Format: decimal
+             * @description Sum of accepted_quantity on POSTED lines (numeric, returned as decimal string)
+             */
+            accepted_quantity: string;
+            /**
+             * Format: decimal
+             * @description Sum of rejected_quantity on POSTED lines (numeric, returned as decimal string)
+             */
+            rejected_quantity: string;
+            /**
+             * Format: decimal
+             * @description Sum of held_quantity on POSTED lines (numeric, returned as decimal string)
+             */
+            held_quantity: string;
+        };
+        PurchaseOrderReadLine: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            po_id: string;
+            line_no: number;
+            /** Format: uuid */
+            source_br04_offer_line_id: string | null;
+            /** Format: uuid */
+            item_bridge_id: string;
+            /**
+             * Format: decimal
+             * @description numeric, returned as decimal string
+             */
+            quantity: string;
+            uom: string;
+            /**
+             * Format: decimal
+             * @description numeric, returned as decimal string
+             */
+            unit_price: string;
+            /** Format: uuid */
+            sales_sourcing_authorisation_id: string | null;
+            /** @description br03_item_catalog_bridge.item_code */
+            item_code: string;
+            /** @description br03_item_catalog_bridge.item_name */
+            item_name: string;
+            /** @description br04_supplier_offer_lines.product_condition of source_br04_offer_line_id (CUSTOMER_JOB lines; null for SALES_ORDER) */
+            product_condition: string | null;
+            /** @description br04_supplier_offer_lines.offered_make (CUSTOMER_JOB lines) */
+            offered_make: string | null;
+            /** @description br04_supplier_offer_lines.offered_part_number (CUSTOMER_JOB lines) */
+            offered_part_number: string | null;
+            /**
+             * Format: decimal
+             * @description Sum of br06_grn_lines.received_quantity over every GRN of this line (posted or not) (numeric, returned as decimal string)
+             */
+            received_quantity: string;
+            /**
+             * Format: decimal
+             * @description GREATEST(quantity - received, 0) (numeric, returned as decimal string)
+             */
+            outstanding_quantity: string;
+        };
+        PurchaseOrderReadDetail: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            company_id: string;
+            /** Format: uuid */
+            job_id: string | null;
+            po_number: string;
+            /** Format: uuid */
+            source_br05_job_release_id: string | null;
+            /** Format: uuid */
+            supplier_invite_id: string | null;
+            supplier_name_snapshot: string;
+            currency_code: string;
+            payment_terms: string | null;
+            /** @enum {string} */
+            po_status: "DRAFT" | "RELEASED" | "ACKNOWLEDGED" | "SHIPPED" | "RECEIVED" | "CLOSED" | "CANCELLED";
+            /** Format: uuid */
+            created_by_id: string;
+            /** Format: uuid */
+            released_by_id: string | null;
+            /** Format: date-time */
+            released_at: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** @enum {string} */
+            purchase_purpose: "CUSTOMER_JOB" | "SALES_ORDER";
+            /** Format: uuid */
+            sales_order_id: string | null;
+            /** Format: uuid */
+            supplier_id: string | null;
+            /** @description service_jobs.job_number (CUSTOMER_JOB POs) */
+            job_number: string | null;
+            /** @description br11_sales_orders.sales_order_number (SALES_ORDER POs) */
+            sales_order_number: string | null;
+            /** @description customers.customer_name: the job's inward receipt customer, else the sales order customer */
+            customer_name: string | null;
+            /** @description employees.full_name of created_by_id */
+            created_by_name: string;
+            /** @description employees.full_name of released_by_id */
+            released_by_name: string | null;
+            acknowledgement: components["schemas"]["PurchaseOrderAcknowledgement"] | null;
+            /** @description Newest first (shipped_at) */
+            shipments: components["schemas"]["PurchaseOrderShipment"][];
+            /** @description GRNs on this PO, newest first */
+            grns: components["schemas"]["PurchaseOrderGrnSummary"][];
+            /** @description Ordered by line_no */
+            lines: components["schemas"]["PurchaseOrderReadLine"][];
         };
         AcknowledgePoDto: {
             supplier_reference?: string;
@@ -11714,6 +11897,95 @@ export interface components {
             /** @description Per-status totals (all 7, zeros included) over the company + `search` only: ignores `status`, `priority`, `job_id` and `engineer_id`. */
             counts_by_status: components["schemas"]["PurchaseMrStatusCounts"];
         };
+        PurchasePoRow: {
+            /**
+             * Format: uuid
+             * @description br06_supplier_purchase_orders.id
+             */
+            id: string;
+            po_number: string;
+            /** @enum {string} */
+            po_status: "DRAFT" | "RELEASED" | "ACKNOWLEDGED" | "SHIPPED" | "RECEIVED" | "CLOSED" | "CANCELLED";
+            /** @enum {string} */
+            purchase_purpose: "CUSTOMER_JOB" | "SALES_ORDER";
+            /**
+             * Format: uuid
+             * @description fdn_suppliers.id (optional on the PO)
+             */
+            supplier_id: string | null;
+            /** @description supplier_name_snapshot */
+            supplier_name: string;
+            /**
+             * Format: uuid
+             * @description CUSTOMER_JOB POs
+             */
+            job_id: string | null;
+            /** @description service_jobs.job_number (CUSTOMER_JOB POs) */
+            job_number: string | null;
+            /**
+             * Format: uuid
+             * @description SALES_ORDER POs
+             */
+            sales_order_id: string | null;
+            /** @description br11_sales_orders.sales_order_number (SALES_ORDER POs) */
+            sales_order_number: string | null;
+            /** @description customers.customer_name: the job's inward receipt customer, else the sales order customer */
+            customer_name: string | null;
+            /** @description ISO 4217, e.g. INR */
+            currency_code: string;
+            payment_terms: string | null;
+            /** @description br06_po_lines rows */
+            lines_count: number;
+            /**
+             * Format: decimal
+             * @description Sum over lines of round(quantity x unit_price, 2), in currency_code (rupees, NOT paise). PO lines store only unit_price: no discount, freight or tax is included (none exists on the PO).
+             */
+            value_pre_tax: string;
+            /** Format: date-time */
+            created_at: string;
+            /** @description employees.full_name of created_by_id */
+            created_by_name: string;
+            /** Format: date-time */
+            released_at: string | null;
+            /** @description employees.full_name of released_by_id */
+            released_by_name: string | null;
+            acknowledgement: components["schemas"]["StoresPoAcknowledgement"] | null;
+            /** @description Newest br06_shipments row (by shipped_at); null if none */
+            latest_shipment: components["schemas"]["StoresPoShipment"] | null;
+            /**
+             * Format: date
+             * @description latest_shipment.expected_arrival_date, else acknowledgement.expected_delivery_date (YYYY-MM-DD)
+             */
+            expected_date: string | null;
+            /** @description GRNs on this PO */
+            grns_count: number;
+            /**
+             * Format: date-time
+             * @description max(br06_grns.received_at) on this PO
+             */
+            last_received_at: string | null;
+            /** @description PO lines whose received quantity (summed over every GRN) is still below the ordered quantity (same as the Stores desk) */
+            lines_outstanding: number;
+        };
+        PurchasePoStatusCounts: {
+            DRAFT: number;
+            RELEASED: number;
+            ACKNOWLEDGED: number;
+            SHIPPED: number;
+            RECEIVED: number;
+            CLOSED: number;
+            CANCELLED: number;
+        };
+        PurchasePoPage: {
+            /** @description Rows matching the filters (all pages) */
+            total: number;
+            page: number;
+            page_size: number;
+            /** @description created_at newest first; po_number desc breaks ties */
+            rows: components["schemas"]["PurchasePoRow"][];
+            /** @description Per-status totals (all 7, zeros included) over the company + `search` only: ignores `status`, `purpose`, `job_id`, `sales_order_id` and `supplier_id`. */
+            counts_by_status: components["schemas"]["PurchasePoStatusCounts"];
+        };
     };
     responses: never;
     parameters: never;
@@ -16717,7 +16989,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PurchaseOrderDetail"];
+                    "application/json": components["schemas"]["PurchaseOrderReadDetail"];
                 };
             };
             /** @description Validation or business-rule failure (including a malformed :id) */
@@ -26316,6 +26588,76 @@ export interface operations {
                 };
             };
             /** @description Requires role: PURCHASE | MANAGEMENT */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    PurchaseOrdersDeskController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Case-insensitive substring match (see each endpoint for the fields searched) */
+                search?: string;
+                /** @description po_status (comma-separated; one or more of DRAFT, RELEASED, ACKNOWLEDGED, SHIPPED, RECEIVED, CLOSED, CANCELLED). Omitted = all. */
+                status?: string;
+                /** @description purchase_purpose (comma-separated; one or more of CUSTOMER_JOB, SALES_ORDER). Omitted = both. */
+                purpose?: string;
+                /** @description Only POs of this job (service_jobs.id) */
+                job_id?: string;
+                /** @description Only POs of this sales order (br11_sales_orders.id) */
+                sales_order_id?: string;
+                /** @description Only POs with this supplier_id (fdn_suppliers.id) */
+                supplier_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchasePoPage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: PURCHASE */
             403: {
                 headers: {
                     [name: string]: unknown;
