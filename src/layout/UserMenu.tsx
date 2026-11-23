@@ -2,10 +2,11 @@
 // scrim .4, popover surface. Who block (pt-8 pb-10 px-12, gap 2): name 14/20 Medium, "login · ROLE" 12/16
 // secondary, "Company: … (CODE)" 12/16 muted; 1px divider; items (18px icon + 14/20 label, gap 12).
 // Real data: GET /auth/me (name, login_id, role) + company name/code; Sign out = POST /auth/logout.
-// "My profile" and "Help & shortcuts" are not rendered (no screen / content exists); the Theme entry is shown
-// with "Dark theme not built yet" (light only in this release).
+// "My profile" and "Help & shortcuts" are not rendered (no screen / content exists); the Theme entry toggles
+// light / dark (src/lib/theme.ts), the same as the nav toggle.
 import { useState } from 'react';
-import { IconLogout, IconMoon, IconX } from '@tabler/icons-react';
+import { IconLogout, IconMoon, IconSun, IconX } from '@tabler/icons-react';
+import { toggleTheme, useTheme } from '../lib/theme';
 import { useAuth, useMe } from '../auth/AuthProvider';
 import { ROLE_LABEL } from '../auth/access';
 import { BottomSheet, Button } from '../ui/primitives';
@@ -33,6 +34,7 @@ function Identity() {
 
 /** Desktop: the top-nav "User" block (avatar 40 brand gradient + name 14/20 Medium + role 12/16 secondary) + menu. */
 export function UserMenuDesktop() {
+  const theme = useTheme();
   const me = useMe();
   const { logout, companyName, companyCode } = useAuth();
   const a = useAnchor<HTMLButtonElement>();
@@ -64,7 +66,12 @@ export function UserMenuDesktop() {
             </p>
           </div>
           <MenuDivider />
-          <ActionItem icon={IconMoon} label="Theme · Light" sub="Dark theme not built yet" disabled />
+          <ActionItem
+            icon={theme === 'dark' ? IconSun : IconMoon}
+            label={`Theme · ${theme === 'dark' ? 'Dark' : 'Light'}`}
+            sub={`Switch to ${theme === 'dark' ? 'light' : 'dark'}`}
+            onClick={toggleTheme}
+          />
           <ActionItem
             icon={IconX}
             label={busy ? 'Signing out…' : 'Sign out'}

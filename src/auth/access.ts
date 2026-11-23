@@ -21,9 +21,13 @@ const NAV: Record<Role, NavItem[]> = {
     { to: '/p', label: 'Dashboard', built: true, end: true },
     { to: '/p/inward', label: 'Inward', built: true },
     { to: '/p/jobs', label: 'Jobs', built: true },
-    { to: '/p/requests', label: 'Requests', built: false },
+    // Company-wide material-request inbox (Figma 03d 177:117991): list GET /purchase/material-requests, detail
+    // GET /jobs/:id/material-requests; start processing + change-request review (src/pages/purchase/requests).
+    { to: '/p/requests', label: 'Requests', built: true },
     { to: '/p/sourcing', label: 'Sourcing', built: true, match: ['/p/rfqs'] },
     { to: '/p/quotes', label: 'Quotes', built: true },
+    // Not built: SUPPLIER purchase orders (BR-06) list — Figma 03g "Purchase · Orders" / O0 177:125758. Not the BR-11
+    // sales orders (those are under Sales & Supply). No company-wide PO list endpoint for Purchase exists yet.
     { to: '/p/orders', label: 'Orders', built: false },
     // BR-11 (PS-D 238:41629 top nav): "Sales & Supply" (sub-tabs Quotes to price · Orders · Outwards) and "Stock" (merged
     // Inventory + Masters: Availability · Journal · Items · Assemblies, not built yet).

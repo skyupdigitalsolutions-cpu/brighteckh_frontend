@@ -15,6 +15,7 @@ import { OverviewRoutes } from './pages/purchase/overview/routes';
 import { InwardRegisterRoutes } from './pages/purchase/inward/register/routes';
 import { JinDetailRoutes } from './pages/purchase/inward/detail/routes';
 import { JobsListRoutes } from './pages/purchase/jobs/routes';
+import { RequestsRoutes } from './pages/purchase/requests/routes';
 import { JobOverviewTab } from './pages/purchase/jobs/JobOverviewTab';
 import { JobSourcingTab } from './pages/purchase/sourcing/JobSourcingTab';
 import { SourcingRoutes } from './pages/purchase/sourcing/routes';
@@ -99,6 +100,7 @@ export function App() {
                   <Route path="purchase-order" element={<PurchaseOrderTab />} />
                   <Route path="repair-test" element={<RepairTestTab />} />
                 </Route>
+                <Route path="requests">{RequestsRoutes}</Route>
                 <Route path="sourcing">{SourcingRoutes}</Route>
                 <Route path="rfqs">{RfqRoutes}</Route>
                 <Route path="quotes">{QuotesRoutes}</Route>

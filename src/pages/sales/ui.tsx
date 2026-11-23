@@ -66,5 +66,5 @@ export function CardHead({ title, right }: { title: string; right?: ReactNode })
 
 /** Loading placeholder bar. */
 export function Skel({ w, h = 14, dark }: { w: number | string; h?: number; dark?: boolean }) {
-  return <span className={cx('block shrink-0 animate-pulse rounded-[6px]', dark ? 'bg-[rgba(24,24,27,0.12)]' : 'bg-disabled')} style={{ width: w, height: h }} aria-hidden />;
+  return <span className={cx('block shrink-0 animate-pulse rounded-[6px]', dark ? 'bg-dash-skeleton' : 'bg-disabled')} style={{ width: w, height: h }} aria-hidden />;
 }

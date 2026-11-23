@@ -55,7 +55,7 @@ function CardHead({ title, right }: { title: string; right?: ReactNode }) {
 
 /** Loading placeholder bar. */
 function Skel({ w, h = 14, dark }: { w: number | string; h?: number; dark?: boolean }) {
-  return <span className={cx('block shrink-0 animate-pulse rounded-[6px]', dark ? 'bg-[rgba(24,24,27,0.12)]' : 'bg-disabled')} style={{ width: w, height: h }} aria-hidden />;
+  return <span className={cx('block shrink-0 animate-pulse rounded-[6px]', dark ? 'bg-dash-skeleton' : 'bg-disabled')} style={{ width: w, height: h }} aria-hidden />;
 }
 
 // ------------------------------------------------------------------ Row 1 · Today's priorities
@@ -107,30 +107,30 @@ function TaskCard({ t, o }: { t: Task; o?: Ov }) {
         backgroundImage: `linear-gradient(136.0975deg, rgba(${t.rgb}, 0.34) 14.286%, rgba(${t.rgb}, 0.1) 85.714%)`,
       }}
     >
-      <span className="flex shrink-0 items-start overflow-clip rounded-[12px] bg-[rgba(255,255,255,0.75)] px-[10px] py-[4px]">
-        <span className="whitespace-nowrap text-[11px] font-semibold leading-[14px] tracking-[0.44px] text-[#18181b]">{t.flag}</span>
+      <span className="flex shrink-0 items-start overflow-clip rounded-[12px] bg-dash-pill px-[10px] py-[4px]">
+        <span className="whitespace-nowrap text-[11px] font-semibold leading-[14px] tracking-[0.44px] text-dash-text">{t.flag}</span>
       </span>
-      <p className="whitespace-nowrap text-[30px] font-medium leading-[34px] text-[#18181b]">
+      <p className="whitespace-nowrap text-[30px] font-medium leading-[34px] text-dash-text">
         {t.title[0]}<br />{t.title[1]}
       </p>
       {o
-        ? <p className="whitespace-nowrap text-[14px] leading-[20px] text-[#3f3f46]">{t.waiting(o)}</p>
+        ? <p className="whitespace-nowrap text-[14px] leading-[20px] text-dash-text-2">{t.waiting(o)}</p>
         : <span className="flex h-[20px] items-center"><Skel w={110} dark /></span>}
       {/* People row (30px avatars): the overview does not say who is on each task — slot kept at its drawn height. */}
       <div className="h-[30px] shrink-0" aria-hidden />
       <div className="flex w-full items-center gap-[12px] overflow-clip">
         <div
-          className="flex h-[6px] min-w-px flex-1 items-start overflow-clip rounded-[3px] bg-[rgba(24,24,27,0.1)]"
+          className="flex h-[6px] min-w-px flex-1 items-start overflow-clip rounded-[3px] bg-dash-track"
           role={o ? 'progressbar' : undefined}
           aria-valuemin={0}
           aria-valuemax={all}
           aria-valuenow={done}
           aria-label={o ? `${done} done today, ${t.remaining(o)} still waiting` : undefined}
         >
-          {pct > 0 && <div className="h-[6px] shrink-0 rounded-[3px] bg-[rgba(24,24,27,0.8)]" style={{ width: `${pct}%` }} />}
+          {pct > 0 && <div className="h-[6px] shrink-0 rounded-[3px] bg-dash-fill" style={{ width: `${pct}%` }} />}
         </div>
         {o
-          ? <span className="whitespace-nowrap font-mono text-[13px] font-medium leading-[18px] text-[#18181b]">{t.today(o)}</span>
+          ? <span className="whitespace-nowrap font-mono text-[13px] font-medium leading-[18px] text-dash-text">{t.today(o)}</span>
           : <Skel w={90} dark />}
       </div>
     </Link>
@@ -139,7 +139,7 @@ function TaskCard({ t, o }: { t: Task; o?: Ov }) {
 
 function TodaysPriorities({ o }: { o?: Ov }) {
   return (
-    <GlassCard className="flex min-w-px flex-1 flex-col items-start gap-[20px] bg-[rgba(255,255,255,0.92)] p-[24px]">
+    <GlassCard className="flex min-w-px flex-1 flex-col items-start gap-[20px] bg-dash-card p-[24px]">
       <CardHead title="Today's priorities" right={<SeeAll to="/p/jobs" />} />
       <div className="flex w-full items-start gap-[16px] overflow-clip">
         {TASKS.map((t) => <TaskCard key={t.key} t={t} o={o} />)}
@@ -172,7 +172,7 @@ function Rings({ shares }: { shares: number[] | null }) {
     <svg width={200} height={200} viewBox="0 0 200 200" className="h-[200px] w-[200px] shrink-0" aria-hidden>
       {LEGEND.map((l, i) => (
         <g key={l.status}>
-          <circle cx={100} cy={100} r={l.r} fill="none" stroke="#18181B" strokeOpacity={0.07} strokeWidth={16} />
+          <circle cx={100} cy={100} r={l.r} fill="none" style={{ stroke: 'var(--color-chart-track)' }} strokeWidth={16} />
           {shares && shares[i]! > 0 && (
             <path d={arcPath(l.r, shares[i]!)} fill="none" stroke={l.colour} strokeWidth={16} strokeLinecap="butt" />
           )}
@@ -252,11 +252,11 @@ function IntakeThisWeek({ o }: { o?: Ov }) {
     <Row2Card title="Intake this week" to="/p/inward" gap={20}>
       <div className="flex w-full shrink-0 items-start justify-end gap-[16px] overflow-clip">
         <div className="flex items-center gap-[6px] overflow-clip">
-          <span className="h-[12px] w-[12px] shrink-0 rounded-[3px] bg-[#da4a3c]" aria-hidden />
+          <span className="h-[12px] w-[12px] shrink-0 rounded-[3px] bg-brand-logo" aria-hidden />
           <span className="whitespace-nowrap text-[12px] leading-[16px] text-fg-2">Units received</span>
         </div>
         <div className="flex items-center gap-[6px] overflow-clip">
-          <span className="h-[12px] w-[12px] shrink-0 rounded-[3px] bg-[#8a8a92]" aria-hidden />
+          <span className="h-[12px] w-[12px] shrink-0 rounded-[3px] bg-chart-bar-muted" aria-hidden />
           <span className="whitespace-nowrap text-[12px] leading-[16px] text-fg-2">Verified</span>
         </div>
       </div>
@@ -273,8 +273,8 @@ function IntakeThisWeek({ o }: { o?: Ov }) {
               <div className="flex min-h-px flex-1 items-end gap-[6px] overflow-clip">
                 {o ? (
                   <>
-                    <div className="w-[20px] shrink-0 rounded-[10px] bg-[#da4a3c]" style={{ height: h(d?.units_received ?? 0) }} />
-                    <div className="w-[20px] shrink-0 rounded-[10px] bg-[#8a8a92]" style={{ height: h(d?.units_verified ?? 0) }} />
+                    <div className="w-[20px] shrink-0 rounded-[10px] bg-brand-logo" style={{ height: h(d?.units_received ?? 0) }} />
+                    <div className="w-[20px] shrink-0 rounded-[10px] bg-chart-bar-muted" style={{ height: h(d?.units_verified ?? 0) }} />
                   </>
                 ) : (
                   <>

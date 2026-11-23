@@ -7,7 +7,7 @@ import { apiErrorMessages, apiStatus } from '../api/http';
 import { useAuth } from '../auth/AuthProvider';
 import { homeFor } from '../auth/access';
 import { Button, InlineAlert } from '../ui/primitives';
-import logoMark from '../assets/brand/logo-mark.svg';
+import { LogoMark } from '../ui/LogoMark';
 
 type LocState = { from?: string; expired?: boolean } | null;
 
@@ -44,7 +44,7 @@ export function LoginPage() {
     <div className="flex min-h-full items-center justify-center bg-canvas px-4 py-10">
       <div className="w-full max-w-[400px]">
         <div className="mb-6 flex items-center gap-3">
-          <img src={logoMark} alt="" width={40} height={40} className="h-10 w-10" />
+          <LogoMark className="h-10 w-10 shrink-0" />
           <div className="leading-tight">
             <p className="text-sm font-semibold tracking-[0.04em] text-brand-logo">BRIGHTECH GROUP</p>
             <p className="text-sm text-fg-2">Job Management System</p>

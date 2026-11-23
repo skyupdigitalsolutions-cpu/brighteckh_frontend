@@ -16,12 +16,15 @@
 //   Items are separate children of their card, so the list that holds them uses the card gap (16 on S1 History).
 import type { ReactNode } from 'react';
 import { cx, Ic, type TablerIcon } from '../../../ui/desktop/Icon';
-import timelineDotProgress from '../../../assets/figma/sourcing/timeline-dot.svg';
-import timelineDotNeutral from '../../../assets/figma/sourcing/timeline-dot-neutral.svg';
-import timelineDotSuccess from '../../../assets/figma/sourcing/timeline-dot-success.svg';
 
 export type TimelineTone = 'neutral' | 'progress' | 'success';
-const TIMELINE_DOT: Record<TimelineTone, string> = { neutral: timelineDotNeutral, progress: timelineDotProgress, success: timelineDotSuccess };
+// Same geometry as the Figma dot assets (18×18, r 7.5, 3px ring), drawn inline so it follows the theme: fill =
+// status/<tone>/fg, ring = status/<tone>/bg (how the dark page binds them, e.g. I113:19305;7:418).
+const TIMELINE_DOT: Record<TimelineTone, { fill: string; ring: string }> = {
+  neutral: { fill: 'var(--color-status-neutral-fg)', ring: 'var(--color-status-neutral-bg)' },
+  progress: { fill: 'var(--color-status-progress-fg)', ring: 'var(--color-status-progress-bg)' },
+  success: { fill: 'var(--color-status-success-fg)', ring: 'var(--color-status-success-bg)' },
+};
 
 export function SectionCard({ children, className, pad = 20, fill }: { children: ReactNode; className?: string; pad?: 20 | 24; fill?: boolean }) {
   return (
@@ -134,7 +137,9 @@ export function TimelineItem({ title, meta, detail, last, tone = 'progress' }: {
     <div className="flex w-full items-start gap-[12px]">
       <div className="flex shrink-0 flex-col items-center gap-[4px] self-stretch overflow-clip">
         <div className="relative h-[12px] w-[12px] shrink-0">
-          <img alt="" src={TIMELINE_DOT[tone]} className="absolute inset-[-25%] block h-[18px] w-[18px] max-w-none" />
+          <svg aria-hidden viewBox="0 0 18 18" className="absolute inset-[-25%] block h-[18px] w-[18px] max-w-none overflow-visible">
+            <circle cx={9} cy={9} r={7.5} strokeWidth={3} style={{ fill: TIMELINE_DOT[tone].fill, stroke: TIMELINE_DOT[tone].ring }} />
+          </svg>
         </div>
         {!last && <div className="min-h-px w-[2px] flex-1 bg-line" />}
       </div>

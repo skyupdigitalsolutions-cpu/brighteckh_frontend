@@ -29,6 +29,12 @@ export default {
           'blocked-bg': v('color-status-blocked-bg'), 'blocked-fg': v('color-status-blocked-fg'), 'blocked-bd': v('color-status-blocked-border'),
         },
         company: { accent: v('company-accent'), subtle: v('company-subtle') },
+        // Dashboard cards + chart tracks (P0 / SD0), themed in src/index.css.
+        dash: {
+          card: v('color-dash-card'), pill: v('color-dash-pill'), text: v('color-dash-text'), 'text-2': v('color-dash-text-2'),
+          track: v('color-dash-track'), fill: v('color-dash-fill'), skeleton: v('color-dash-skeleton'),
+        },
+        chart: { track: v('color-chart-track'), 'bar-muted': v('color-chart-bar-muted') },
       },
       borderRadius: {
         't-sm': v('radius-sm'), 't-md': v('radius-md'), 't-lg': v('radius-lg'), 't-field': v('radius-field'),

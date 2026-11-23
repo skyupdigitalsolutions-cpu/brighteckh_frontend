@@ -52,10 +52,10 @@ function TaskCard({ rgb, flag, title, to, line1, line2, loading }: {
         backgroundImage: `linear-gradient(138.08deg, rgba(${rgb}, 0.34) 14.286%, rgba(${rgb}, 0.1) 85.714%)`,
       }}
     >
-      <span className="flex shrink-0 items-start overflow-clip rounded-[12px] bg-[rgba(255,255,255,0.75)] px-[10px] py-[4px]">
-        <span className="whitespace-nowrap text-[11px] font-semibold leading-[14px] tracking-[0.44px] text-[#18181b]">{flag}</span>
+      <span className="flex shrink-0 items-start overflow-clip rounded-[12px] bg-dash-pill px-[10px] py-[4px]">
+        <span className="whitespace-nowrap text-[11px] font-semibold leading-[14px] tracking-[0.44px] text-dash-text">{flag}</span>
       </span>
-      <p className="whitespace-nowrap text-[30px] font-medium leading-[34px] text-[#18181b]">{title[0]}<br />{title[1]}</p>
+      <p className="whitespace-nowrap text-[30px] font-medium leading-[34px] text-dash-text">{title[0]}<br />{title[1]}</p>
       {loading ? (
         <>
           <span className="flex h-[20px] items-center"><Skel w={150} dark /></span>
@@ -63,8 +63,8 @@ function TaskCard({ rgb, flag, title, to, line1, line2, loading }: {
         </>
       ) : (
         <>
-          <p className="max-w-full truncate whitespace-nowrap text-[14px] font-medium leading-[20px] text-[#18181b]">{line1}</p>
-          <p className="max-w-full truncate whitespace-nowrap text-[14px] leading-[20px] text-[#3f3f46]">{line2 ?? ' '}</p>
+          <p className="max-w-full truncate whitespace-nowrap text-[14px] font-medium leading-[20px] text-dash-text">{line1}</p>
+          <p className="max-w-full truncate whitespace-nowrap text-[14px] leading-[20px] text-dash-text-2">{line2 ?? ' '}</p>
         </>
       )}
     </Link>
@@ -85,7 +85,7 @@ function TodaysPriorities({ toSend, awaiting, oldestAwaiting, expiring, loading 
   const awaitingCustomers = [...new Set((awaiting?.rows ?? []).map((r) => r.customer_name))];
   const nExp = expiring?.total ?? 0;
   return (
-    <GlassCard className="flex min-w-px flex-1 flex-col items-start gap-[16px] bg-[rgba(255,255,255,0.92)] p-[24px]">
+    <GlassCard className="flex min-w-px flex-1 flex-col items-start gap-[16px] bg-dash-card p-[24px]">
       <CardHead title="Today's priorities" right={<SeeAll to="/s/to-send" />} />
       <div className="flex w-full items-start gap-[16px] overflow-clip">
         <TaskCard
@@ -166,7 +166,7 @@ function QuoteOutcomes({ counts }: { counts?: SalesStageCounts }) {
             const f = counts && sent > 0 ? o.count(counts) / sent : 0;
             return (
               <g key={o.key}>
-                <circle cx={100} cy={100} r={o.r} fill="none" stroke="#18181B" strokeOpacity={0.07} strokeWidth={16} />
+                <circle cx={100} cy={100} r={o.r} fill="none" style={{ stroke: 'var(--color-chart-track)' }} strokeWidth={16} />
                 {f > 0 && <path d={arcPath(o.r, f)} fill="none" stroke={o.colour} strokeWidth={16} strokeLinecap="butt" />}
               </g>
             );

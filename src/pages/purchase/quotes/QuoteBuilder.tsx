@@ -352,7 +352,7 @@ export function QuoteBuilder({ job, quote, responses, canWork, canSeeCost, start
               const err = attempted && editable ? lineErr(l) : { desc: false, qty: false, uom: false, price: false };
               const newRow = editable && l.isNew;
               return (
-                <div key={l.key} role="row" className={cx('flex w-full items-center gap-[10px] overflow-clip border-b border-line px-[14px] py-[12px]', newRow && 'bg-[rgba(218,74,60,0.08)]')}>
+                <div key={l.key} role="row" className={cx('flex w-full items-center gap-[10px] overflow-clip border-b border-line px-[14px] py-[12px]', newRow && 'bg-brand-subtle')}>
                   <div className="flex w-[140px] shrink-0 items-center overflow-clip">
                     {newRow
                       ? <BadgeSelect label={`Line ${i + 1} type`} value={l.line_type} options={LINE_TYPES} onChange={(v) => setLine(l.key, { line_type: v })} />

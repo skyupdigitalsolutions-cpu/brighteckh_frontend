@@ -6,6 +6,7 @@ import '@fontsource/ibm-plex-sans/600.css';
 import '@fontsource/ibm-plex-mono/500.css';
 import '@fontsource/ibm-plex-mono/600.css';
 import './index.css';
+import './lib/theme';
 import { App } from './App';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

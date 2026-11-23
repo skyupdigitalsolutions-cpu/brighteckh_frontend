@@ -3847,6 +3847,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/purchase/material-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Material request inbox: company MRs with job, customer, engineer, line count and change-request counts
+         * @description Paginated: `page` (default 1), `page_size` (default 25, max 100) -> { rows, total, page, page_size, counts_by_status }. Filters: `status`, `priority` (comma-separated DB values), `job_id`, `engineer_id` (responsible engineer), `search` (request number, job number, engineer name, customer name). `counts_by_status` covers company + `search` only. DRAFT requests are included. No lines, prices, offers or supplier data.
+         */
+        get: operations["MaterialRequestsDeskController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -11620,6 +11640,80 @@ export interface components {
             /** @description Per-status totals under `search` only (ignores `status`) */
             counts_by_status: components["schemas"]["SupplyOutwardStatusCounts"];
         };
+        PurchaseMrRow: {
+            /**
+             * Format: uuid
+             * @description br03_material_requests.id
+             */
+            id: string;
+            /** @description MR-<CODE>-000001 */
+            request_number: string;
+            /** @enum {string} */
+            status: "DRAFT" | "SUBMITTED" | "PROCESSING" | "RETURNED" | "CHANGE_REQUESTED" | "WITHDRAWN" | "CLOSED";
+            /** @enum {string} */
+            priority: "NORMAL" | "URGENT" | "CRITICAL";
+            /**
+             * Format: date
+             * @description YYYY-MM-DD
+             */
+            required_by_date: string | null;
+            required_by_reason: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            submitted_at: string | null;
+            /**
+             * Format: date-time
+             * @description Submit + 1 working hour (working calendar)
+             */
+            self_edit_deadline_at: string | null;
+            /** Format: date-time */
+            purchase_processing_started_at: string | null;
+            /** @description employees.full_name of purchase_started_by_id */
+            purchase_started_by_name: string | null;
+            /** Format: date-time */
+            closed_at: string | null;
+            /** @description br03_can_engineer_edit(id) at read time: DRAFT, or SUBMITTED before Purchase starts and before the deadline */
+            engineer_can_edit: boolean;
+            /** Format: uuid */
+            job_id: string;
+            /** @description service_jobs.job_number */
+            job_number: string;
+            /** @description customers.customer_name via the job's inward receipt */
+            customer_name: string;
+            /** Format: uuid */
+            responsible_engineer_id: string;
+            /** @description employees.full_name */
+            responsible_engineer_name: string;
+            /** @description br03_material_request_lines rows */
+            lines_count: number;
+            /** @description br03_material_change_requests with review_status PENDING */
+            pending_change_requests: number;
+            /**
+             * Format: date-time
+             * @description Newest change request's creation time. br03_material_change_requests has no timestamp column, so this is the changed_at of its BR03_CHANGE_REQUEST_CREATED activity_audit_log row. Null when the request has none.
+             */
+            latest_change_request_at: string | null;
+        };
+        PurchaseMrStatusCounts: {
+            DRAFT: number;
+            SUBMITTED: number;
+            PROCESSING: number;
+            RETURNED: number;
+            CHANGE_REQUESTED: number;
+            WITHDRAWN: number;
+            CLOSED: number;
+        };
+        PurchaseMrPage: {
+            /** @description Rows matching the filters (all pages) */
+            total: number;
+            page: number;
+            page_size: number;
+            /** @description CHANGE_REQUESTED first, then SUBMITTED, then every other status; within each group priority CRITICAL -> URGENT -> NORMAL, then submitted_at (else created_at) newest first; request_number desc breaks ties. */
+            rows: components["schemas"]["PurchaseMrRow"][];
+            /** @description Per-status totals (all 7, zeros included) over the company + `search` only: ignores `status`, `priority`, `job_id` and `engineer_id`. */
+            counts_by_status: components["schemas"]["PurchaseMrStatusCounts"];
+        };
     };
     responses: never;
     parameters: never;
@@ -11980,6 +12074,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Requires role: PURCHASE */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Referenced record not found */
             404: {
                 headers: {
@@ -12175,6 +12278,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Requires role: PURCHASE */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Referenced record not found */
             404: {
                 headers: {
@@ -12338,7 +12450,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description company_id (body or query) is not the company of the authenticated user */
+            /** @description Requires role: PURCHASE */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -12400,7 +12512,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description company_id (body or query) is not the company of the authenticated user */
+            /** @description Requires role: PURCHASE */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -12462,7 +12574,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description company_id (body or query) is not the company of the authenticated user */
+            /** @description Requires role: PURCHASE */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -12524,7 +12636,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description company_id (body or query) is not the company of the authenticated user */
+            /** @description Requires role: PURCHASE */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -12586,7 +12698,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description company_id (body or query) is not the company of the authenticated user */
+            /** @description Requires role: PURCHASE */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -12648,7 +12760,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description company_id (body or query) is not the company of the authenticated user */
+            /** @description Requires role: PURCHASE */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -14241,6 +14353,15 @@ export interface operations {
             };
             /** @description Missing, invalid or expired access token */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: PURCHASE | MANAGEMENT | ENGINEER */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -26127,6 +26248,74 @@ export interface operations {
                 };
             };
             /** @description Requires role: SALES | PURCHASE | FINANCE | MANAGEMENT */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    MaterialRequestsDeskController_list: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Case-insensitive substring match (see each endpoint for the fields searched) */
+                search?: string;
+                /** @description br03_material_requests.status (comma-separated; one or more of DRAFT, SUBMITTED, PROCESSING, RETURNED, CHANGE_REQUESTED, WITHDRAWN, CLOSED). Omitted = all. */
+                status?: string;
+                /** @description br03_material_requests.priority (comma-separated; one or more of NORMAL, URGENT, CRITICAL). Omitted = all. */
+                priority?: string;
+                /** @description Only requests of this job (service_jobs.id) */
+                job_id?: string;
+                /** @description Only requests whose responsible_engineer_id is this employee */
+                engineer_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PurchaseMrPage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: PURCHASE | MANAGEMENT */
             403: {
                 headers: {
                     [name: string]: unknown;

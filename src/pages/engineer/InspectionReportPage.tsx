@@ -164,7 +164,7 @@ function ReportForm({ job, report }: { job: JobDetail; report: InspectionReport 
           onClick={() => setCustomerVisible((v) => !v)}
           className={cx('relative h-8 w-[52px] shrink-0 rounded-full transition-colors', customerVisible ? 'bg-accent' : 'bg-line-strong')}
         >
-          <span className={cx('absolute top-1 h-6 w-6 rounded-full bg-white transition-all', customerVisible ? 'left-6' : 'left-1')} />
+          <span className={cx('absolute top-1 h-6 w-6 rounded-full bg-fg-on-accent transition-all', customerVisible ? 'left-6' : 'left-1')} />
         </button>
       </label>
 

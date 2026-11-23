@@ -53,7 +53,8 @@ export function QuotePreview({ open, onClose, quote, rev, companyId, customerNam
       <Scrim alpha={0.55} onClick={onClose} z="z-40" />
       <div role="dialog" aria-modal="true" aria-label={`Preview ${quote.quote_number}`} className="pointer-events-none fixed inset-0 z-50 flex items-start justify-center overflow-y-auto py-[72px]">
         <div className="pointer-events-auto relative flex flex-col items-center gap-[12px]">
-          <article className="flex min-h-[880px] w-[620px] flex-col gap-[14px] rounded-[8px] bg-surface p-[40px] text-fg">
+          {/* Customer-facing paper: LIGHT in both themes, as Figma draws it (153:33888). */}
+          <article data-theme-island="light" className="flex min-h-[880px] w-[620px] flex-col gap-[14px] rounded-[8px] bg-surface p-[40px] text-fg">
             <header className="flex w-full items-center gap-[12px]">
               <img src={logoMark} alt="" className="h-[43px] w-[44px] shrink-0" />
               <div className="flex min-w-px flex-1 flex-col gap-[2px]">

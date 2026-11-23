@@ -54,8 +54,96 @@
     radial-gradient(45% 45% at 0% 100%, rgba(231, 201, 190, 0.45) 0%, rgba(231, 201, 190, 0) 100%),
     radial-gradient(42% 42% at 97% 0%, rgba(246, 185, 166, 0.55) 0%, rgba(246, 185, 166, 0) 100%),
     linear-gradient(90deg, #efedec 0%, #efedec 100%);
+
+  /* Dashboard cards (P0 "Today's priorities", SD0) + chart tracks — light values as drawn on the light page. */
+  --color-dash-card: rgba(255, 255, 255, 0.92);
+  --color-dash-pill: rgba(255, 255, 255, 0.75);
+  --color-dash-text: #18181b;
+  --color-dash-text-2: #3f3f46;
+  --color-dash-track: rgba(24, 24, 27, 0.1);
+  --color-dash-fill: rgba(24, 24, 27, 0.8);
+  --color-dash-skeleton: rgba(24, 24, 27, 0.12);
+  --color-chart-track: rgba(24, 24, 27, 0.07);
+  --color-chart-bar-muted: #8a8a92;
+
+  color-scheme: light;
 }
 :root[data-company="CHN"] { --company-accent: #0f7c7c; }
+
+/* Dark theme — Figma "🌙 Dark theme — All screens" (page 42:11), `Color` variable collection, mode Dark (42:0).
+   Set by the nav theme toggle (src/lib/theme.ts) as <html data-theme="dark">. Values not in Figma are marked. */
+:root[data-theme="dark"] {
+  --color-bg-canvas: #09090b; /* frames paint #09090b (the bg/canvas variable says #0b0b0d) — frames win (decision 3) */
+  --color-bg-surface: #151517; --color-bg-subtle: #1f1f23;
+  --color-bg-inverse: #2c2c2f; --color-bg-inverse-raised: #3a3a3f; --color-bg-disabled: #26262a;
+  --color-text-primary: #f4f4f5; --color-text-secondary: #b4b4bb; --color-text-muted: #8a8a92;
+  --color-text-inverse: #ffffff; --color-text-inverse-muted: #c9c9cf; --color-text-disabled: #5e5e66;
+  --color-text-on-accent: #ffffff;
+  --color-border-default: rgba(255, 255, 255, 0.09); --color-border-strong: rgba(255, 255, 255, 0.18);
+  --color-border-focus: #8fb2ff; --color-border-inverse: #4a4a50;
+  --color-accent-fill: #c63e30; --color-accent-fill-hover: #da4a3c;
+  --color-brand-logo: #da4a3c; --color-brand-subtle: rgba(218, 74, 60, 0.16); --color-brand-text: #f4a196; --color-brand-gear: #a3a3ab;
+  --color-brand-border: #e5705f;
+  --color-warning-fill: #f5a300; --color-warning-bg: rgba(245, 163, 0, 0.14); --color-warning-fg: #ffc84d; --color-warning-border: rgba(245, 163, 0, 0.45);
+  --color-feedback-danger-fill: #c7305a; --color-feedback-success-fill: #1f9d5c;
+  --color-status-neutral-bg: rgba(255, 255, 255, 0.07); --color-status-neutral-fg: #c9c9cf; --color-status-neutral-border: rgba(255, 255, 255, 0.14);
+  --color-status-progress-bg: rgba(91, 141, 255, 0.14); --color-status-progress-fg: #9dbbff; --color-status-progress-border: rgba(91, 141, 255, 0.35);
+  --color-status-success-bg: rgba(46, 190, 120, 0.14); --color-status-success-fg: #6fd8a3; --color-status-success-border: rgba(46, 190, 120, 0.35);
+  --color-status-blocked-bg: rgba(236, 72, 110, 0.14); --color-status-blocked-fg: #ff8fa8; --color-status-blocked-border: rgba(236, 72, 110, 0.38);
+  /* company-accent: the Company collection has no Dark mode, so dark frames keep the light accent (unchanged here).
+     company-subtle: NOT IN FIGMA — derived as the accent at 14% (the status-bg approach), decision 2. */
+  --company-subtle: rgba(91, 75, 196, 0.14);
+
+  --color-surface-glass: rgba(255, 255, 255, 0.05);
+  --color-surface-glass-strong: rgba(24, 24, 27, 0.78);
+  --color-surface-glass-border: rgba(255, 255, 255, 0.1);
+  /* gradient-brand and every shadow are identical on Figma's light and dark pages — kept (decision 4). */
+
+  /* #09090b + 4 radial washes (raw fills on the dark frames). Figma lists the dark washes per light wash; the light
+     wash geometry (position / size) is reused — Figma gives colour + opacity only. */
+  --canvas-desktop:
+    radial-gradient(35% 35% at 100% 95%, rgba(15, 90, 82, 0.26) 0%, rgba(15, 90, 82, 0) 100%),
+    radial-gradient(45% 45% at 55% 105%, rgba(61, 47, 134, 0.32) 0%, rgba(61, 47, 134, 0) 100%),
+    radial-gradient(45% 45% at 0% 100%, rgba(122, 31, 22, 0.45) 0%, rgba(122, 31, 22, 0) 100%),
+    radial-gradient(42% 42% at 97% 0%, rgba(218, 74, 60, 0.34) 0%, rgba(218, 74, 60, 0) 100%),
+    linear-gradient(90deg, #09090b 0%, #09090b 100%);
+
+  /* P0 "Today's priorities" raw dark fills (77:4166 card, 77:4173 pill, 77:4176 text, 77:4183/4184 track/fill);
+     ring tracks 77:4238 / SD0 152:33618. */
+  --color-dash-card: rgba(26, 26, 30, 0.92);
+  --color-dash-pill: rgba(0, 0, 0, 0.35);
+  --color-dash-text: #e4e4e7;
+  --color-dash-text-2: #b4b4bb;      /* NOT IN FIGMA — the dark text/secondary value */
+  --color-dash-track: rgba(255, 255, 255, 0.18);
+  --color-dash-fill: rgba(255, 255, 255, 0.9);
+  --color-dash-skeleton: rgba(255, 255, 255, 0.12); /* NOT IN FIGMA — mirrors the light skeleton on white */
+  --color-chart-track: rgba(255, 255, 255, 0.07);
+  /* chart-bar-muted (#8a8a92) is unchanged on the dark page. */
+
+  color-scheme: dark;
+}
+/* CHN in dark: company-subtle = the CHN accent at 14% (NOT IN FIGMA, decision 2). */
+:root[data-theme="dark"][data-company="CHN"] { --company-subtle: rgba(15, 124, 124, 0.14); }
+
+/* Islands that stay LIGHT in the dark theme (Figma keeps the customer-facing quotation preview light, 153:33888):
+   re-declare the light values on the subtree. */
+[data-theme-island="light"] {
+  --color-bg-canvas: #eeeef0; --color-bg-surface: #ffffff; --color-bg-subtle: #f7f7f8;
+  --color-bg-inverse: #1c1c1e; --color-bg-inverse-raised: #2c2c2f; --color-bg-disabled: #eeeef0;
+  --color-text-primary: #111113; --color-text-secondary: #5a5a5f; --color-text-muted: #737378;
+  --color-text-inverse: #ffffff; --color-text-inverse-muted: #bebec4; --color-text-disabled: #94949a;
+  --color-border-default: #dcdce0; --color-border-strong: #94949a; --color-border-focus: #1f5fd1; --color-border-inverse: #434347;
+  --color-accent-fill: #c63e30; --color-accent-fill-hover: #a83327;
+  --color-brand-logo: #da4a3c; --color-brand-subtle: #fdf0ee; --color-brand-text: #84271e; --color-brand-gear: #737378;
+  --color-brand-border: #c63e30;
+  --color-warning-fill: #f5a300; --color-warning-bg: #fff8e6; --color-warning-fg: #7a4d00; --color-warning-border: #d98c00;
+  --color-feedback-danger-fill: #b4234a; --color-feedback-success-fill: #1c7c4a;
+  --color-status-neutral-bg: #eeeef0; --color-status-neutral-fg: #434347; --color-status-neutral-border: #bebec4;
+  --color-status-progress-bg: #eaf2ff; --color-status-progress-fg: #123e8c; --color-status-progress-border: #b9d3ff;
+  --color-status-success-bg: #e8f6ee; --color-status-success-fg: #0f5131; --color-status-success-border: #a9dfc0;
+  --color-status-blocked-bg: #fcedf1; --color-status-blocked-fg: #7e1733; --color-status-blocked-border: #f2b8c7;
+  color-scheme: light;
+}
 
 html, body, #root { height: 100%; }
 body { @apply bg-canvas font-sans text-fg antialiased; }
