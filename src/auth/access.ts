@@ -30,9 +30,10 @@ const NAV: Record<Role, NavItem[]> = {
     // PURCHASE only). Not the BR-11 sales orders (those are under Sales & Supply).
     { to: '/p/orders', label: 'Orders', built: true },
     // BR-11 (PS-D 238:41629 top nav): "Sales & Supply" (sub-tabs Quotes to price · Orders · Outwards) and "Stock" (merged
-    // Inventory + Masters: Availability · Journal · Items · Assemblies, not built yet).
+    // Inventory + Masters: Availability · Journal · Items · Assemblies — GET /inventory/availability + /stock/*, PURCHASE only,
+    // read-only; src/pages/purchase/stock).
     { to: '/p/supply', label: 'Sales & Supply', built: true },
-    { to: '/p/stock', label: 'Stock', built: false },
+    { to: '/p/stock', label: 'Stock', built: true },
   ],
   // Figma "Shell / Top nav · Sales" (152:788), S-D panel 177:137224, routed under /s. The quote detail
   // (/s/quotes/:id) keeps the Sent pill active.

@@ -116,13 +116,22 @@ const supplyOutwardLine: Map<S<'OutwardLineDetail'>['status']> = { DRAFT: 'neutr
 const supplyDelivery: Map<S<'Br11DeliveryEvidenceRow'>['delivery_status']> = { DELIVERED: 'success', FAILED: 'blocked', DAMAGED: 'blocked' };
 const invoiceReadiness: Map<S<'InvoiceQueueRow'>['readiness']> = { READY: 'progress', WAITING: 'neutral', BLOCKED: 'blocked' };
 const invoiceStatus: Map<S<'InvoiceDetail'>['invoice_status']> = { ISSUED: 'progress', PARTIALLY_PAID: 'progress', PAID: 'success', CANCELLED: 'blocked' };
+// Purchase Stock pill (Figma D·I1 177:105342 / D·I2 177:105406): movement badge, journal status, location-role chips.
+const stockMovement: Map<S<'StockJournalRow'>['movement_type']> = {
+  RECEIPT: 'success', ISSUE: 'progress', CONSUME: 'neutral', RETURN: 'neutral', SUPPLIER_RETURN: 'neutral', TRANSFER: 'progress', ADJUST: 'neutral',
+};
+const journalStatus: Map<S<'StockJournalRow'>['status']> = { POSTED: 'success', REVERSED: 'blocked' };
+const locationRole: Map<S<'StockBalance'>['role']> = {
+  MAIN_STORE: 'success', ENGINEER_HELD: 'progress', QUARANTINE: 'blocked', IN_TRANSIT: 'progress', RETURNED: 'neutral', CONSUMED: 'neutral',
+  SUPPLIER_RETURN: 'neutral',
+};
 
 export const TONES = {
   job, assignment, route, session, inspectionReport, reportVersion, outcome, materialRequest, changeRequest,
   itemStatus, repairReport, testResult, issue, slaState, reviewDecision, materialReturn, consumption,
   receipt, unitVerification, dcException, rfq, offerTechnical, quote, shortage, invite, offer, purchaseOrder, grn, br10Status, kpiStatus,
   supplyEnquiry, supplyQuoteStage, supplyRevision, supplyResponse, supplyOrder, supplyAuthorisation, supplyReservation, supplyChange,
-  supplyOutward, supplyOutwardLine, supplyDelivery, invoiceReadiness, invoiceStatus,
+  supplyOutward, supplyOutwardLine, supplyDelivery, invoiceReadiness, invoiceStatus, stockMovement, journalStatus, locationRole,
 } as const;
 export type ToneDomain = keyof typeof TONES;
 

@@ -17,6 +17,7 @@ import { JinDetailRoutes } from './pages/purchase/inward/detail/routes';
 import { JobsListRoutes } from './pages/purchase/jobs/routes';
 import { RequestsRoutes } from './pages/purchase/requests/routes';
 import { OrdersRoutes } from './pages/purchase/orders/routes';
+import { StockRoutes } from './pages/purchase/stock/routes';
 import { JobOverviewTab } from './pages/purchase/jobs/JobOverviewTab';
 import { JobSourcingTab } from './pages/purchase/sourcing/JobSourcingTab';
 import { SourcingRoutes } from './pages/purchase/sourcing/routes';
@@ -103,6 +104,7 @@ export function App() {
                 </Route>
                 <Route path="requests">{RequestsRoutes}</Route>
                 <Route path="orders">{OrdersRoutes}</Route>
+                <Route path="stock">{StockRoutes}</Route>
                 <Route path="sourcing">{SourcingRoutes}</Route>
                 <Route path="rfqs">{RfqRoutes}</Route>
                 <Route path="quotes">{QuotesRoutes}</Route>

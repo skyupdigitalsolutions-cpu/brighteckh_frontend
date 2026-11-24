@@ -3887,6 +3887,100 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/stock/journal": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ledger journal for the company: item, locations, reference resolved to its GRN / job / SOUT number, actor
+         * @description Paginated (`page`, `page_size` <= 100) -> { rows, total, page, page_size, counts_by_movement_type }. Filters: `movement_type`, `reference_kind`, `location_role` (from OR to) as comma-separated DB values, `reference_id`, `item_id`, `from` / `to` (YYYY-MM-DD, company timezone, inclusive), `search` (item code / name, GRN / PO / job / SOUT / SO number, actor name). Counts cover company + `search` only. Newest first. Never returns idempotency keys.
+         */
+        get: operations["StockDeskController_journal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Item Master register (all statuses) with creator / approver names and BOM usage
+         * @description Paginated -> { rows, total, page, page_size, counts_by_status, counts_by_record_type }. Filters: `status`, `record_type`, `stock_flag` (comma-separated), `search` (item code, standard name, short description). Counts cover `search` only. Ordered by item_code.
+         */
+        get: operations["StockDeskController_items"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock/items/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Item Master row + assemblies whose latest BOM revision uses it + the company's availability */
+        get: operations["StockDeskController_item"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock/assemblies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Assembly Master register with latest BOM revision, line count and not-requestable item lines
+         * @description Paginated -> { rows, total, page, page_size, counts_by_status }. Filters: `status` (comma-separated), `search` (assembly code, standard name, OEM compatibility). Counts cover `search` only. Ordered by assembly_code.
+         */
+        get: operations["StockDeskController_assemblies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stock/assemblies/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Assembly Master row + BOM revisions + the lines of one revision (default latest) with item status */
+        get: operations["StockDeskController_assembly"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -11985,6 +12079,330 @@ export interface components {
             rows: components["schemas"]["PurchasePoRow"][];
             /** @description Per-status totals (all 7, zeros included) over the company + `search` only: ignores `status`, `purpose`, `job_id`, `sales_order_id` and `supplier_id`. */
             counts_by_status: components["schemas"]["PurchasePoStatusCounts"];
+        };
+        StockJournalRow: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            posted_at: string;
+            /** @enum {string} */
+            movement_type: "RECEIPT" | "ISSUE" | "CONSUME" | "RETURN" | "SUPPLIER_RETURN" | "TRANSFER" | "ADJUST";
+            /** @enum {string} */
+            status: "POSTED" | "REVERSED";
+            /** Format: uuid */
+            item_id: string;
+            item_code: string;
+            item_name: string;
+            uom: string;
+            /**
+             * Format: decimal
+             * @description fdn_inventory_journal.qty (always > 0; direction = from -> to) (numeric, returned as decimal string)
+             */
+            qty: string;
+            /** @description fdn_inventory_locations.role of from_location_id; null = stock entered the company (receipt) */
+            from_location_role: string | null;
+            from_location_code: string | null;
+            /** @description fdn_inventory_locations.role of to_location_id; null = stock left the company (sale issue) */
+            to_location_role: string | null;
+            to_location_code: string | null;
+            /** @description As stored (BR06_GRN_LINE, BR06_SUPPLIER_RETURN, BR07_ISSUE, BR07_CONSUME, BR07_RETURN, BR11_SALE_ISSUE today) */
+            reference_kind: string;
+            /** Format: uuid */
+            reference_id: string | null;
+            /**
+             * @description What reference_label names; null = not resolvable
+             * @enum {string|null}
+             */
+            reference_document: "GRN" | "JOB" | "SALES_OUTWARD" | null;
+            /** @description Human document number: GRN number (BR06_*), job number (BR07_*), SOUT number (BR11_SALE_ISSUE) */
+            reference_label: string | null;
+            /**
+             * Format: uuid
+             * @description br06_grns.id (BR06_*)
+             */
+            grn_id: string | null;
+            /**
+             * Format: uuid
+             * @description br06_supplier_purchase_orders.id of that GRN (BR06_*)
+             */
+            po_id: string | null;
+            po_number: string | null;
+            /**
+             * Format: uuid
+             * @description BR07_* rows, and BR06_* rows whose PO is a repair (CUSTOMER_JOB) PO
+             */
+            job_id: string | null;
+            job_number: string | null;
+            /**
+             * Format: uuid
+             * @description br11_outward_batches.id (BR11_SALE_ISSUE)
+             */
+            outward_id: string | null;
+            /**
+             * Format: uuid
+             * @description BR11_SALE_ISSUE rows (via the outward line's sales order line); SALES_ORDER PO GRNs too
+             */
+            sales_order_id: string | null;
+            sales_order_number: string | null;
+            /** @description employees.full_name of actor_id */
+            actor_name: string | null;
+        };
+        StockMovementCounts: {
+            RECEIPT: number;
+            ISSUE: number;
+            CONSUME: number;
+            RETURN: number;
+            SUPPLIER_RETURN: number;
+            TRANSFER: number;
+            ADJUST: number;
+        };
+        StockJournalPage: {
+            /** @description Rows matching the filters (all pages) */
+            total: number;
+            page: number;
+            page_size: number;
+            rows: components["schemas"]["StockJournalRow"][];
+            /** @description Postings per movement type (all 7, zeros included) over company + `search` only */
+            counts_by_movement_type: components["schemas"]["StockMovementCounts"];
+        };
+        StockItemRow: {
+            /** Format: uuid */
+            id: string;
+            /** @description 12 digits */
+            item_code: string;
+            standard_name: string;
+            short_description: string | null;
+            /** @enum {string} */
+            record_type: "ITEM" | "COMPONENT" | "CONSUMABLE";
+            base_uom: string;
+            /** @enum {string} */
+            stock_flag: "STOCK" | "NON_STOCK" | "CONSUMABLE";
+            /** @enum {string} */
+            status: "DRAFT" | "UNDER_REVIEW" | "APPROVED" | "ACTIVE" | "ON_HOLD" | "INACTIVE" | "SUPERSEDED";
+            cc: string;
+            ss: string;
+            tt: string;
+            use_case: string;
+            /** Format: date-time */
+            created_at: string;
+            /** @description employees.full_name of created_by_id */
+            created_by_name: string;
+            /** Format: date-time */
+            tech_approved_at: string | null;
+            /** @description employees.full_name of tech_approved_by_id */
+            tech_approved_by_name: string | null;
+            /** @description Distinct assemblies whose LATEST BOM revision has this item */
+            bom_usage_count: number;
+        };
+        StockMasterStatusCounts: {
+            DRAFT: number;
+            UNDER_REVIEW: number;
+            APPROVED: number;
+            ACTIVE: number;
+            ON_HOLD: number;
+            INACTIVE: number;
+            SUPERSEDED: number;
+        };
+        StockRecordTypeCounts: {
+            ITEM: number;
+            COMPONENT: number;
+            CONSUMABLE: number;
+        };
+        StockItemsPage: {
+            /** @description Rows matching the filters (all pages) */
+            total: number;
+            page: number;
+            page_size: number;
+            rows: components["schemas"]["StockItemRow"][];
+            /** @description All 7 statuses over `search` only */
+            counts_by_status: components["schemas"]["StockMasterStatusCounts"];
+            /** @description All 3 record types over `search` only */
+            counts_by_record_type: components["schemas"]["StockRecordTypeCounts"];
+        };
+        StockItemUsedIn: {
+            /** Format: uuid */
+            assembly_id: string;
+            assembly_code: string;
+            standard_name: string;
+            /** @enum {string} */
+            assembly_status: "DRAFT" | "UNDER_REVIEW" | "APPROVED" | "ACTIVE" | "ON_HOLD" | "INACTIVE" | "SUPERSEDED";
+            /** @description The assembly's latest BOM revision (the one this line is on) */
+            bom_revision: number;
+            /**
+             * Format: decimal
+             * @description fdn_assembly_bom.qty_per (numeric, returned as decimal string)
+             */
+            qty_per: string;
+            uom: string;
+        };
+        StockBalance: {
+            /** @enum {string} */
+            role: "MAIN_STORE" | "QUARANTINE" | "ENGINEER_HELD" | "IN_TRANSIT" | "RETURNED" | "CONSUMED" | "SUPPLIER_RETURN";
+            code: string;
+            /**
+             * Format: decimal
+             * @description fdn_inventory_balances.qty_on_hand (numeric, returned as decimal string)
+             */
+            qty_on_hand: string;
+        };
+        StockItemAvailability: {
+            /**
+             * Format: decimal
+             * @description fdn_allocatable(company, item) = MAIN_STORE on hand - ACTIVE reservations (numeric, returned as decimal string)
+             */
+            allocatable: string;
+            /**
+             * Format: decimal
+             * @description Sum of ACTIVE fdn_inventory_reservations for company + item (numeric, returned as decimal string)
+             */
+            reserved: string;
+            /** @description Every balance row of the company for this item (ordered by role, code) */
+            balances: components["schemas"]["StockBalance"][];
+        };
+        StockItemDetail: {
+            /** Format: uuid */
+            id: string;
+            /** @description 12 digits */
+            item_code: string;
+            standard_name: string;
+            short_description: string | null;
+            /** @enum {string} */
+            record_type: "ITEM" | "COMPONENT" | "CONSUMABLE";
+            base_uom: string;
+            /** @enum {string} */
+            stock_flag: "STOCK" | "NON_STOCK" | "CONSUMABLE";
+            /** @enum {string} */
+            status: "DRAFT" | "UNDER_REVIEW" | "APPROVED" | "ACTIVE" | "ON_HOLD" | "INACTIVE" | "SUPERSEDED";
+            cc: string;
+            ss: string;
+            tt: string;
+            use_case: string;
+            /** Format: date-time */
+            created_at: string;
+            /** @description employees.full_name of created_by_id */
+            created_by_name: string;
+            /** Format: date-time */
+            tech_approved_at: string | null;
+            /** @description employees.full_name of tech_approved_by_id */
+            tech_approved_by_name: string | null;
+            /** @description Distinct assemblies whose LATEST BOM revision has this item */
+            bom_usage_count: number;
+            criticality: string | null;
+            hsn_tax: string | null;
+            /** Format: decimal */
+            reorder_min_qty: string | null;
+            lead_time_days: number | null;
+            batch_tracking: boolean;
+            serial_tracking: boolean;
+            /** Format: date-time */
+            released_at: string | null;
+            /** @description employees.full_name of released_by_id */
+            released_by_name: string | null;
+            effective_revision: number;
+            /** @description Assemblies whose latest BOM revision has this item, by assembly_code */
+            used_in: components["schemas"]["StockItemUsedIn"][];
+            /** @description For the caller's company */
+            availability: components["schemas"]["StockItemAvailability"];
+        };
+        StockAssemblyRow: {
+            /** Format: uuid */
+            id: string;
+            /** @description 12 digits */
+            assembly_code: string;
+            standard_name: string;
+            /** @enum {string} */
+            assembly_type: "ELECTRONIC_CARD" | "MOTOR" | "DRIVE" | "MODULE" | "INSTRUMENT" | "OTHER";
+            /** @description Closest field to "make / model" (there is no make or model column) */
+            oem_compatibility: string | null;
+            /** @enum {string} */
+            bom_status: "KNOWN" | "PARTIAL" | "UNKNOWN" | "NOT_APPLICABLE";
+            repairable: boolean;
+            saleable: boolean;
+            /** @enum {string} */
+            status: "DRAFT" | "UNDER_REVIEW" | "APPROVED" | "ACTIVE" | "ON_HOLD" | "INACTIVE" | "SUPERSEDED";
+            effective_revision: number;
+            /** @description Highest bom_revision with lines; null = no BOM lines */
+            latest_bom_revision: number | null;
+            /** @description Lines on the latest BOM revision */
+            bom_lines: number;
+            /** @description Lines on the latest revision whose item is not APPROVED / ACTIVE (not requestable) */
+            draft_item_lines: number;
+            /** Format: date-time */
+            created_at: string;
+        };
+        StockAssembliesPage: {
+            /** @description Rows matching the filters (all pages) */
+            total: number;
+            page: number;
+            page_size: number;
+            rows: components["schemas"]["StockAssemblyRow"][];
+            /** @description All 7 statuses over `search` only */
+            counts_by_status: components["schemas"]["StockMasterStatusCounts"];
+        };
+        StockBomLine: {
+            /**
+             * Format: uuid
+             * @description fdn_assembly_bom.id
+             */
+            id: string;
+            /** Format: uuid */
+            item_id: string;
+            item_code: string;
+            item_name: string;
+            /**
+             * Format: decimal
+             * @description fdn_assembly_bom.qty_per (numeric, returned as decimal string)
+             */
+            qty_per: string;
+            uom: string;
+            /** @enum {string} */
+            item_status: "DRAFT" | "UNDER_REVIEW" | "APPROVED" | "ACTIVE" | "ON_HOLD" | "INACTIVE" | "SUPERSEDED";
+            /** @description item_status is APPROVED or ACTIVE (the ledger / catalogue rule) */
+            item_requestable: boolean;
+        };
+        StockAssemblyDetail: {
+            /** Format: uuid */
+            id: string;
+            /** @description 12 digits */
+            assembly_code: string;
+            standard_name: string;
+            /** @enum {string} */
+            assembly_type: "ELECTRONIC_CARD" | "MOTOR" | "DRIVE" | "MODULE" | "INSTRUMENT" | "OTHER";
+            /** @description Closest field to "make / model" (there is no make or model column) */
+            oem_compatibility: string | null;
+            /** @enum {string} */
+            bom_status: "KNOWN" | "PARTIAL" | "UNKNOWN" | "NOT_APPLICABLE";
+            repairable: boolean;
+            saleable: boolean;
+            /** @enum {string} */
+            status: "DRAFT" | "UNDER_REVIEW" | "APPROVED" | "ACTIVE" | "ON_HOLD" | "INACTIVE" | "SUPERSEDED";
+            effective_revision: number;
+            /** @description Highest bom_revision with lines; null = no BOM lines */
+            latest_bom_revision: number | null;
+            /** @description Lines on the latest BOM revision */
+            bom_lines: number;
+            /** @description Lines on the latest revision whose item is not APPROVED / ACTIVE (not requestable) */
+            draft_item_lines: number;
+            /** Format: date-time */
+            created_at: string;
+            cc: string;
+            ss: string;
+            tt: string;
+            core_function: string;
+            hardware_revision: string | null;
+            firmware_compat: string | null;
+            variant_interface: string | null;
+            /** @description employees.full_name of created_by_id */
+            created_by_name: string;
+            /** Format: date-time */
+            tech_approved_at: string | null;
+            tech_approved_by_name: string | null;
+            /** @description Distinct bom_revision values with lines, ascending */
+            bom_revisions: number[];
+            /** @description The revision `bom` shows (?revision=, else latest); null = no BOM lines */
+            bom_revision: number | null;
+            /** @description Lines of bom_revision, by item_code */
+            bom: components["schemas"]["StockBomLine"][];
         };
     };
     responses: never;
@@ -26637,6 +27055,325 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PurchasePoPage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: PURCHASE */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    StockDeskController_journal: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Case-insensitive substring match (see each endpoint for the fields searched) */
+                search?: string;
+                /** @description movement_type (comma-separated; RECEIPT, ISSUE, CONSUME, RETURN, SUPPLIER_RETURN, TRANSFER, ADJUST). Omitted = all. */
+                movement_type?: string;
+                /** @description reference_kind (comma-separated; BR06_GRN_LINE, BR06_SUPPLIER_RETURN, BR07_ISSUE, BR07_CONSUME, BR07_RETURN, BR11_SALE_ISSUE). Omitted = all. */
+                reference_kind?: string;
+                /** @description Only postings of this reference_id (GRN line, BR-07 issue / consumption / return, BR-11 outward line) */
+                reference_id?: string;
+                /** @description Only this item (fdn_item_master.id) */
+                item_id?: string;
+                /** @description Location role, matched on from OR to (comma-separated; MAIN_STORE, QUARANTINE, ENGINEER_HELD, IN_TRANSIT, RETURNED, CONSUMED, SUPPLIER_RETURN) */
+                location_role?: string;
+                /** @description posted_at on or after this date (YYYY-MM-DD, company timezone) */
+                from?: string;
+                /** @description posted_at on or before this date (YYYY-MM-DD, company timezone, inclusive) */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockJournalPage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: PURCHASE */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    StockDeskController_items: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Case-insensitive substring match (see each endpoint for the fields searched) */
+                search?: string;
+                /** @description status (comma-separated; DRAFT, UNDER_REVIEW, APPROVED, ACTIVE, ON_HOLD, INACTIVE, SUPERSEDED). Omitted = all. */
+                status?: string;
+                /** @description record_type (comma-separated; ITEM, COMPONENT, CONSUMABLE). Omitted = all. */
+                record_type?: string;
+                /** @description stock_flag (comma-separated; STOCK, NON_STOCK, CONSUMABLE). Omitted = all. */
+                stock_flag?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockItemsPage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: PURCHASE */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    StockDeskController_item: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockItemDetail"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: PURCHASE */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    StockDeskController_assemblies: {
+        parameters: {
+            query?: {
+                page?: number;
+                page_size?: number;
+                /** @description Case-insensitive substring match (see each endpoint for the fields searched) */
+                search?: string;
+                /** @description status (comma-separated; DRAFT, UNDER_REVIEW, APPROVED, ACTIVE, ON_HOLD, INACTIVE, SUPERSEDED). Omitted = all. */
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockAssembliesPage"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: PURCHASE */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    StockDeskController_assembly: {
+        parameters: {
+            query?: {
+                /** @description BOM revision to return (default: the latest revision that has lines) */
+                revision?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockAssemblyDetail"];
                 };
             };
             /** @description Validation or business-rule failure (including a malformed :id) */
