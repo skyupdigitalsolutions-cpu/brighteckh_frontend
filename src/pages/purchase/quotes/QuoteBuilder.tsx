@@ -30,6 +30,8 @@
 //   collects the approver (LookupPicker over all active employees: the API validates no role) + reason, then resends.
 // - SENT banner: revisions have no sent_at / sender / recipient. The only send record is the BR04_QUOTE_SENT audit
 //   row, which job progress (GET /jobs/{id}/progress, QUOTE stage `at`) exposes as the job's FIRST send — shown as such.
+// - MANAGEMENT (MQ1, read-only): Cost & margin is shown (chip "Purchase & Management only", as drawn), but the RFQ offer
+//   reads behind the pricing reference / landed cost are PURCHASE-only, so those rows show "—" (GapNote G-MQ-1).
 import { useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IconAlertTriangle, IconFilePlus, IconLock, IconPlus, IconSend, IconShieldCheck, IconX } from '@tabler/icons-react';
@@ -240,7 +242,8 @@ export function QuoteBuilder({ job, quote, responses, canWork, canSeeCost, start
   const reviseM = useReviseQuote(quote?.id ?? '', job.id);
   const releaseM = useReleaseToSales(quote?.id ?? '', job.id);
   const saveM = isCreate ? createM : reviseM;
-  const offers = useJobOfferLines(job.id, canSeeCost);
+  // RFQ reads (GET /jobs/{id}/rfqs, /rfqs/{id}) are PURCHASE-only: Management (canSeeCost, not canWork) skips them.
+  const offers = useJobOfferLines(job.id, canSeeCost && canWork);
 
   const setLine = (key: string, patch: Partial<DraftLine>) =>
     setForm((f) => ({ ...f, lines: f.lines.map((l) => (l.key === key ? { ...l, ...patch } : l)) }));
@@ -420,7 +423,7 @@ export function QuoteBuilder({ job, quote, responses, canWork, canSeeCost, start
                 <h3 className="min-w-px flex-1 text-[18px] font-semibold leading-[24px] text-fg">Cost &amp; margin</h3>
                 <div className="flex shrink-0 items-center gap-[6px] overflow-clip rounded-[14px] bg-subtle py-[6px] pl-[10px] pr-[12px]">
                   <Ic icon={IconLock} size={14} className="text-fg-muted" />
-                  <span className="whitespace-nowrap text-[12px] leading-[16px] text-fg-2">Purchase only</span>
+                  <span className="whitespace-nowrap text-[12px] leading-[16px] text-fg-2">{canWork ? 'Purchase only' : 'Purchase & Management only'}</span>
                 </div>
               </div>
               {editable ? (
@@ -436,14 +439,17 @@ export function QuoteBuilder({ job, quote, responses, canWork, canSeeCost, start
                 </>
               ) : (
                 <>
-                  <SumRow label="Pricing reference" value={refOffer ? refOffer.label.split(' · ').slice(0, 2).join(' · ') : refOfferId ? '…' : '—'} />
-                  <SumRow label="Procurement offer" value={procOffer ? procOffer.label.split(' · ').slice(0, 2).join(' · ') : procOfferId ? '…' : '—'} />
+                  <SumRow label="Pricing reference" value={refOffer ? refOffer.label.split(' · ').slice(0, 2).join(' · ') : refOfferId && canWork ? '…' : '—'} />
+                  <SumRow label="Procurement offer" value={procOffer ? procOffer.label.split(' · ').slice(0, 2).join(' · ') : procOfferId && canWork ? '…' : '—'} />
                 </>
               )}
               <SumRow label="Material cost (landed)" value={refOffer?.line.comparable_landed_cost ? formatINR(refOffer.line.comparable_landed_cost) : '—'} />
               <SumRow label="Material price" value={formatPaiseBig(materialPaise)} />
               <SumRow label="Material margin" value="—" strong tone="success" />
               <div className="flex h-[8px] w-full items-start overflow-clip rounded-[4px] bg-subtle" aria-hidden />
+              {!canWork && (refOfferId || procOfferId) && (
+                <GapNote code="G-MQ-1">The pricing reference, procurement offer and landed cost come from the job&apos;s RFQ offers, which are Purchase-only.</GapNote>
+              )}
               <GapNote code="G-D-3">No margin rule is defined (BR-10's margin is UNVERIFIED), so no margin is computed. Landed cost is the reference offer line's DB value.</GapNote>
             </CardShell>
           )}

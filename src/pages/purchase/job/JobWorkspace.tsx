@@ -8,10 +8,17 @@
 // Purchase order · Repair & test. Tab content is an <Outlet/>; screens read the loaded job via useJobWorkspace().
 // Route: /p/jobs/:jobId/* — child paths overview | inspection | material | sourcing | quote | authorisation |
 // purchase-order | repair-test (index redirects to overview).
+//
+// Also MANAGEMENT's read-only job page — MJ1 · Job (view) 177:140458 at /mg/jobs/:jobId/overview, and the quote view
+// MQ1 177:140738… at /mg/quotes/:quoteId (MgQuoteWorkspace passes `jobId`). Management gets no tab bar (MJ1 draws none)
+// and "view only" in the meta. The PURCHASE-only lookups are not called: customer / assembly / engineer names come from
+// the job's GET /jobs row (allows MANAGEMENT; matched by id after a search on the job number).
 import { Navigate, Outlet, useOutletContext, useParams } from 'react-router-dom';
+import { useMe } from '../../../auth/AuthProvider';
+import { can, deskBase } from '../../../auth/access';
 import { IconFileUnknown } from '@tabler/icons-react';
 import {
-  useAssembliesByIds, useCustomersByIds, useEngineersByIds, useJob, useJobProgress, useReceipt,
+  useAssembliesByIds, useCustomersByIds, useEngineersByIds, useJob, useJobProgress, useJobsList, useReceipt,
   type AssemblyLookupRow, type CustomerLookupRow, type EquipmentUnit, type InwardReceipt, type Job,
 } from '../api';
 import { PageHeader } from '../../../ui/desktop/PageHeader';
@@ -41,11 +48,11 @@ export type JobWorkspaceContext = {
   unit: EquipmentUnit | undefined;
   /** Units in the unit's equipment group (unit_number is numbered within the group). 0 while loading. */
   unitsInGroup: number;
-  /** Customer of the receipt (lookup). undefined while loading / not found. */
-  customer: CustomerLookupRow | undefined;
+  /** Customer of the receipt (lookup, or the GET /jobs row for Management). undefined while loading / not found. */
+  customer: Pick<CustomerLookupRow, 'customer_name'> | undefined;
   customerLoading: boolean;
-  /** Assembly of the unit's equipment group (lookup). */
-  assembly: AssemblyLookupRow | undefined;
+  /** Assembly of the unit's equipment group (lookup, or the GET /jobs row for Management). */
+  assembly: Pick<AssemblyLookupRow, 'assembly_name'> | undefined;
   /** Current engineer's name (lookup, else progress history). null if unassigned or unknown. */
   engineerName: string | null;
 };
@@ -53,7 +60,10 @@ export type JobWorkspaceContext = {
 /** Tab screens call this to get the loaded job (only valid under <JobWorkspace>). */
 export const useJobWorkspace = () => useOutletContext<JobWorkspaceContext>();
 
+/** Purchase only: Management's job page (MJ1) has no tab bar. */
 function Tabs({ jobId }: { jobId: string }) {
+  const me = useMe();
+  if (!can.purchaseWork(me.role)) return null;
   return (
     <TabBar label="Job sections">
       {JOB_TABS.map((t) => <TabLink key={t.path} to={`/p/jobs/${jobId}/${t.path}`} label={t.label} />)}
@@ -61,8 +71,13 @@ function Tabs({ jobId }: { jobId: string }) {
   );
 }
 
-export function JobWorkspace() {
-  const { jobId = '' } = useParams();
+/** `jobId` overrides the route param (Management's quote view loads the job from the quote). */
+export function JobWorkspace({ jobId: jobIdProp }: { jobId?: string } = {}) {
+  const params = useParams();
+  const jobId = jobIdProp ?? params.jobId ?? '';
+  const me = useMe();
+  const purchase = can.purchaseWork(me.role);
+  const base = deskBase(me.role);
   const jobQ = useJob(jobId);
   const receiptQ = useReceipt(jobQ.data?.inward_id);
   const progressQ = useJobProgress(jobQ.data ? jobId : undefined);
@@ -70,9 +85,12 @@ export function JobWorkspace() {
   const unit = receipt?.equipment_units.find((u) => u.id === jobQ.data?.unit_id);
   const group = unit ? receipt?.equipment_groups.find((g) => g.id === unit.group_id) : undefined;
   const engineerId = jobQ.data?.current_assignment?.engineer_id;
-  const customersQ = useCustomersByIds([receipt?.customer_id]);
-  const assembliesQ = useAssembliesByIds([group?.assembly_id]);
-  const engineersQ = useEngineersByIds([engineerId]);
+  // Lookups are PURCHASE-only: Management passes no ids (the hooks stay disabled) and reads its GET /jobs row instead.
+  const customersQ = useCustomersByIds(purchase ? [receipt?.customer_id] : []);
+  const assembliesQ = useAssembliesByIds(purchase ? [group?.assembly_id] : []);
+  const engineersQ = useEngineersByIds(purchase ? [engineerId] : []);
+  const rowQ = useJobsList({ search: jobQ.data?.job_number, page_size: 25 }, !purchase && !!jobQ.data);
+  const row = rowQ.data?.rows.find((r) => r.id === jobId);
 
   if (jobQ.isPending) {
     return (
@@ -103,7 +121,7 @@ export function JobWorkspace() {
                 icon={IconFileUnknown}
                 title="Job not found"
                 body="This Job ID doesn't exist in your company, or the link is wrong."
-                action={<ButtonLink to="/p/jobs" kind="secondary">Back to jobs</ButtonLink>}
+                action={<ButtonLink to={`${base}/jobs`} kind="secondary">Back to jobs</ButtonLink>}
               />
             ) : (
               <ErrorState title="Couldn't load this job" body={errorBody(jobQ.error)} onRetry={() => jobQ.refetch()} retrying={jobQ.isFetching} />
@@ -115,18 +133,22 @@ export function JobWorkspace() {
   }
 
   const job = jobQ.data;
-  const customer = receipt ? customersQ.data?.[receipt.customer_id] : undefined;
-  const assembly = group ? assembliesQ.data?.[group.assembly_id] : undefined;
+  const customer = purchase
+    ? (receipt ? customersQ.data?.[receipt.customer_id] : undefined)
+    : (row ? { customer_name: row.customer_name } : undefined);
+  const assembly = purchase
+    ? (group ? assembliesQ.data?.[group.assembly_id] : undefined)
+    : (row?.assembly_name ? { assembly_name: row.assembly_name } : undefined);
   const engineerName = engineerId
-    ? engineersQ.data?.[engineerId]?.full_name
+    ? (purchase ? engineersQ.data?.[engineerId]?.full_name : row?.current_engineer_name)
       ?? progressQ.data?.assignments.find((x) => x.is_current)?.engineer_name
       ?? null
     : null;
   const unitsInGroup = receipt && unit ? receipt.equipment_units.filter((u) => u.group_id === unit.group_id).length : 0;
   const ctx: JobWorkspaceContext = {
-    job, receipt, unit, unitsInGroup, customer, customerLoading: !!receipt && customersQ.isPending, assembly, engineerName,
+    job, receipt, unit, unitsInGroup, customer, customerLoading: purchase ? !!receipt && customersQ.isPending : rowQ.isPending, assembly, engineerName,
   };
-  const meta = [assembly?.assembly_name, unit?.observed_model, customer?.customer_name].filter(Boolean).join(' · ');
+  const meta = [assembly?.assembly_name, unit?.observed_model, customer?.customer_name, !purchase && 'view only'].filter(Boolean).join(' · ');
 
   return (
     <>

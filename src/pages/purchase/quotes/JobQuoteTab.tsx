@@ -3,8 +3,10 @@
 // ?q=<quoteId> picks the quote (Q1 links land here via /p/quotes/:quoteId); ?revise=1 opens "Create revision".
 // Four states: loading (skeleton in the lines card), error (StateCard + retry), empty (no quote yet → Start quote),
 // success (builder / locked view).
+// Also MANAGEMENT's MQ1 · Quote (view) at /mg/quotes/:quoteId (MgQuoteWorkspace): the route's quoteId picks the quote;
+// read-only (canWork false), Cost & margin shown (seeSupplierCost) without the RFQ offer reads, which are PURCHASE-only.
 import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import { IconFileInvoice, IconFileUnknown } from '@tabler/icons-react';
 import { useQuote, useQuotes } from '../api';
 import { useJobWorkspace } from '../job/JobWorkspace';
@@ -36,6 +38,7 @@ export function JobQuoteTab() {
   const canWork = !!role && can.purchaseWork(role);
   const canSeeCost = !!role && can.seeSupplierCost(role);
   const [sp, setSp] = useSearchParams();
+  const { quoteId: routeQuoteId } = useParams();
   const quotesQ = useQuotes(job.id);
   const responsesQ = useQuoteResponses(job.id);
   const [creating, setCreating] = useState(false);
@@ -75,7 +78,7 @@ export function JobQuoteTab() {
     );
   }
 
-  const selected = quotes.find((q) => q.id === sp.get('q')) ?? quotes[0];
+  const selected = quotes.find((q) => q.id === (sp.get('q') ?? routeQuoteId)) ?? quotes[0];
   const select = (id: string) => setSp({ q: id }, { replace: true });
 
   return (

@@ -13,12 +13,15 @@
 // separately but no total, and the quote total composition is an open client decision (CLAUDE.md §5, G-D-2), so no
 // total is computed here. Tabs follow the API quote_status enum (Figma's five + EXPIRED; SUPERSEDED never heads a quote).
 // "New quote" picks the job by number / customer (LookupPicker over GET /jobs) and opens its Quote tab.
+//
+// Also MANAGEMENT's MQ0 · Quotes (view) 177:140581 at /mg/quotes (GET /quotes allows MANAGEMENT): same list with
+// "view only" in the meta, no New quote / Create revision, rows open /mg/quotes/:id (MQ1) and /mg/jobs/:id (MJ1).
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IconCopy, IconEye, IconFileInvoice, IconFilePlus, IconPlus, IconSearch, IconTool } from '@tabler/icons-react';
 import { useQuotesList, type QuoteListRow, type QuotesListParams } from '../api';
 import { useAuth } from '../../../auth/AuthProvider';
-import { can } from '../../../auth/access';
+import { can, deskBase } from '../../../auth/access';
 import {
   Badge, Button, Drawer, EmptyState, ErrorState, Ic, LookupPicker, PageContent, PageHeader, Pagination, RowMenuTrigger,
   SearchField, SkeletonRows, StatusPill, TD, TH, TR, Tab, TabBar, TableCard, ToolbarCard, ToolbarSpacer, errorBody,
@@ -83,7 +86,7 @@ export function QuotesList() {
 
   return (
     <>
-      <PageHeader title="Quotes" meta="Customer quotations · prices set manually by Purchase · Sales sends them" />
+      <PageHeader title="Quotes" meta={`Customer quotations · prices set manually by Purchase · Sales sends them${canWork ? '' : ' · view only'}`} />
       <PageContent>
         <TabBar shadow label="Quote status">
           {TABS.map((t) => (
@@ -139,11 +142,14 @@ function QuoteRow({ q, canWork }: { q: QuoteListRow; canWork: boolean }) {
   const navigate = useNavigate();
   const toast = useToast();
   const [menuOpen, setMenuOpen] = useState(false);
+  const role = useAuth().me?.role;
+  const base = deskBase(role);
   const s = q.latest_quote_status;
-  const open = () => navigate(`/p/jobs/${q.job_id}/quote?q=${q.id}`);
+  // Purchase opens the quote inside the job workspace (Q1 is drawn there); Management has its own quote page (MQ1).
+  const open = () => navigate(canWork ? `/p/jobs/${q.job_id}/quote?q=${q.id}` : `${base}/quotes/${q.id}`);
   const menu: RowMenuItem[] = [
     { label: 'Open quote', icon: IconEye, onSelect: open },
-    { label: 'Open job', icon: IconTool, onSelect: () => navigate(`/p/jobs/${q.job_id}/overview`) },
+    { label: 'Open job', icon: IconTool, onSelect: () => navigate(`${base}/jobs/${q.job_id}/overview`) },
     ...(canWork && REVISABLE.has(s)
       ? [{ label: 'Create revision', icon: IconFilePlus, onSelect: () => navigate(`/p/jobs/${q.job_id}/quote?q=${q.id}${s === 'DRAFT' ? '' : '&revise=1'}`) }]
       : []),

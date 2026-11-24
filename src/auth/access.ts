@@ -11,10 +11,15 @@ export type NavItem = {
   to: string; label: string; built: boolean; end?: boolean; match?: string[];
   /** Data-driven visibility: 'br10Authoriser' = only when GET /mis/authorities names the caller's role as an authoriser. */
   gate?: 'br10Authoriser';
+  /**
+   * Kept in NAV for the record but never rendered (navFor drops it): the screen is blocked on a client decision, so a
+   * dead "isn't built yet" pill is not shown. Its URL still falls through to the shell's NotBuiltPage.
+   */
+  hidden?: true;
 };
 
 // Purchase labels are the Figma "Shell / Top nav · Purchase" pills (177:102545), routed under /p.
-// Other roles follow the "Who sees what" matrix (00 · Foundations) and are not built yet (/m).
+// Other roles follow the "Who sees what" matrix (00 · Foundations); EXTERNAL_COORD has no screens (/m).
 const NAV: Record<Role, NavItem[]> = {
   ENGINEER: [{ to: '/jobs', label: 'My jobs', built: true }],
   PURCHASE: [
@@ -48,26 +53,36 @@ const NAV: Record<Role, NavItem[]> = {
     { to: '/s/orders', label: 'Orders', built: true },
   ],
   // Figma "Shell / Top nav · Stores" (ST-D panel 177:139285), routed under /st. Create GRN (/st/receive/:poId) keeps
-  // Receive active; GRN detail keeps GRNs active. Dashboard / Quarantine / Inventory are not built yet.
+  // Receive active; GRN detail keeps GRNs active. Dashboard (STD0) is the Stores landing page.
   STORES_QUALITY: [
-    { to: '/st/dashboard', label: 'Dashboard', built: false },
+    { to: '/st/dashboard', label: 'Dashboard', built: true },
     { to: '/st/receive', label: 'Receive', built: true },
     { to: '/st/grns', label: 'GRNs', built: true },
-    { to: '/st/quarantine', label: 'Quarantine', built: false },
-    { to: '/st/inventory', label: 'Inventory', built: false },
+    // PENDING CLIENT DECISION (Quarantine feature): no Stores-readable quarantine list, supplier return is Purchase-only,
+    // and there is no hold-release action or hold / reject reason. Hidden until the client scopes the feature.
+    { to: '/st/quarantine', label: 'Quarantine', built: false, hidden: true },
+    // PENDING CLIENT DECISION (stock role scope): /stock/* is PURCHASE-only (product owner, 23 Nov 2026). Hidden until
+    // the client decides whether Stores gets the stock reads.
+    { to: '/st/inventory', label: 'Inventory', built: false, hidden: true },
   ],
-  // BR-10 MIS under /mg (no Figma frames; kit build). The Figma "Shell / Top nav · Management" pills (M-D panel
-  // 177:140121: Overview, Jobs, Quotes, Purchase orders, Inventory, Masters) follow, not built yet.
+  // Figma "Shell / Top nav · Management" (M-D panel 177:140121, view only) under /mg: Overview (MD0, the landing page),
+  // Jobs (MJ0 / MJ1), Quotes (MQ0 / MQ1) — read-only reuses of the Purchase screens — then the BR-10 MIS pills (no Figma
+  // frames; kit build).
   MANAGEMENT: [
+    { to: '/mg/overview', label: 'Overview', built: true },
+    { to: '/mg/jobs', label: 'Jobs', built: true },
+    { to: '/mg/quotes', label: 'Quotes', built: true },
+    // PENDING CLIENT DECISION (PO role scope): GET /purchase-orders is PURCHASE-only (product owner, 23 Nov 2026:
+    // Management does not get the PO list yet). Hidden until the client decides.
+    { to: '/mg/orders', label: 'Purchase orders', built: false, hidden: true },
+    // PENDING CLIENT DECISION (stock role scope): /stock/* is PURCHASE-only. Hidden until the client decides.
+    { to: '/mg/inventory', label: 'Inventory', built: false, hidden: true },
+    // PENDING CLIENT DECISION (stock role scope): the Item / Assembly Master reads (/stock/items, /stock/assemblies) are
+    // PURCHASE-only. Hidden until the client decides.
+    { to: '/mg/masters', label: 'Masters', built: false, hidden: true },
     { to: '/mg', label: 'Reports', built: true, end: true, match: ['/mg/reports'] },
     { to: '/mg/approvals', label: 'Approvals', built: true, gate: 'br10Authoriser' },
     { to: '/mg/access', label: 'My access', built: true },
-    { to: '/mg/overview', label: 'Overview', built: false },
-    { to: '/mg/jobs', label: 'Jobs', built: false },
-    { to: '/mg/quotes', label: 'Quotes', built: false },
-    { to: '/mg/orders', label: 'Purchase orders', built: false },
-    { to: '/mg/inventory', label: 'Inventory', built: false },
-    { to: '/mg/masters', label: 'Masters', built: false },
   ],
   // F-D · Finance · Desktop panel (247:51039), routed under /f.
   FINANCE: [
@@ -87,8 +102,8 @@ const NAV: Record<Role, NavItem[]> = {
   EXTERNAL_COORD: [],
 };
 
-export const navFor = (role: Role) => NAV[role] ?? [];
-/** Landing page: the role's first BUILT nav item (Stores' Dashboard pill isn't built, so Stores lands on Receive). */
+export const navFor = (role: Role) => (NAV[role] ?? []).filter((i) => !i.hidden);
+/** Landing page: the role's first BUILT nav item (Stores → Dashboard, Management → Overview). */
 export const homeFor = (role: Role) =>
   (role === 'ENGINEER' ? '/jobs' : (navFor(role).find((i) => i.built) ?? navFor(role)[0])?.to ?? '/m/none');
 
@@ -111,6 +126,12 @@ export const can = {
   /** BR-10 role bindings + report grants (create / activate / revoke, STANDARD approval): @Roles('SYSTEM_ADMIN'). */
   misAdmin: (r: Role) => r === 'SYSTEM_ADMIN',
 };
+
+/**
+ * Desk prefix for the screens Purchase shares read-only with Management (jobs list, job overview, quotes):
+ * links inside them stay in the caller's own shell.
+ */
+export const deskBase = (role: Role | undefined) => (role === 'MANAGEMENT' ? '/mg' : '/p');
 
 export const ROLE_LABEL: Record<Role, string> = {
   PURCHASE: 'Purchase', ENGINEER: 'Engineer', SALES: 'Sales', STORES_QUALITY: 'Stores / Quality',

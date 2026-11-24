@@ -9,11 +9,15 @@
 // DATA: GET /jobs (useJobsList) — server pagination (8 per page as drawn), status (tab group ∩ status menu), priority,
 // engineer_id (uuid | 'unassigned'), search (job, JIN, serial, make, model, assembly, customer; debounced).
 // Engineer menu options = GET /lookups/engineers. Header "n open" = GET /jobs?status=<open set>&page_size=1 → total.
+//
+// Also MANAGEMENT's MJ0 · Jobs (view) 177:140279 at /mg/jobs (GET /jobs allows MANAGEMENT): same table, "view only" in the
+// meta, links stay under /mg, no assign / inward-receipt actions, and no Engineer menu (GET /lookups/engineers is
+// PURCHASE-only → GapNote G-MJ-1). MJ0 draws no tabs / toolbar; they are kept so the list can be filtered and paged.
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IconChevronDown, IconEye, IconFilePlus, IconInbox, IconSearch, IconUser } from '@tabler/icons-react';
 import { useMe } from '../../../auth/AuthProvider';
-import { can } from '../../../auth/access';
+import { can, deskBase } from '../../../auth/access';
 import { useEngineerLookup, useJobsList, type JobListRow, type JobsListParams } from '../api';
 import { PageHeader } from '../../../ui/desktop/PageHeader';
 import { PageContent } from '../../../ui/desktop/Glass';
@@ -31,6 +35,7 @@ import { Button } from '../../../ui/desktop/Button';
 import { Avatar } from '../../../ui/desktop/Avatar';
 import { useToast } from '../../../ui/desktop/Toast';
 import { Ic, cx } from '../../../ui/desktop/Icon';
+import { GapNote } from '../../../ui/desktop/Feedback';
 import { useDebouncedValue } from '../../../lib/useDebouncedValue';
 import {
   OPEN_STATUSES, PRIORITY_OPTIONS, STATUS_OPTIONS, TABS, formatUpdated, isOpen,
@@ -46,6 +51,8 @@ const COLS = { id: 110, customer: 190, engineer: 150, stage: 190, priority: 100,
 type EngineerFilter = string;
 
 export function JobsListPage() {
+  const me = useMe();
+  const purchase = can.purchaseWork(me.role);
   const [tab, setTab] = useState<JobsTab>('all');
   const [status, setStatus] = useState<JobStatus | 'ALL'>('ALL');
   const [priority, setPriority] = useState<JobPriority | 'ALL'>('ALL');
@@ -75,7 +82,8 @@ export function JobsListPage() {
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const filtered = tab !== 'all' || status !== 'ALL' || priority !== 'ALL' || engineer !== 'ALL' || !!q;
 
-  const meta = openQ.data ? `One job per physical unit · ${openQ.data.total} open` : 'One job per physical unit';
+  const viewOnly = purchase ? '' : ' · view only';
+  const meta = openQ.data ? `One job per physical unit · ${openQ.data.total} open${viewOnly}` : `One job per physical unit${viewOnly}`;
   const countText = !data ? '—'
     : q ? `${total} ${total === 1 ? 'result' : 'results'}`
       : `${data.rows.length} of ${total} jobs`;
@@ -97,8 +105,11 @@ export function JobsListPage() {
           <SearchField value={search} onChange={resetPage(setSearch)} placeholder="Search job ID, equipment, customer" />
           <FilterMenu label="Status" value={status} options={STATUS_OPTIONS} onChange={resetPage(setStatus)} allValue="ALL" menuWidth={240} />
           <FilterMenu label="Priority" value={priority} options={PRIORITY_OPTIONS} onChange={resetPage(setPriority)} allValue="ALL" menuWidth={240} />
-          <EngineerMenu value={engineer} onChange={resetPage(setEngineer)} />
+          {purchase && <EngineerMenu value={engineer} onChange={resetPage(setEngineer)} />}
         </ToolbarCard>
+        {!purchase && (
+          <GapNote code="G-MJ-1">No Engineer filter: the engineer lookup (GET /lookups/engineers) is Purchase-only.</GapNote>
+        )}
 
         {!data && listQ.isError ? (
           <StateCard>
@@ -170,11 +181,13 @@ function JobRow({ row, onAssign }: { row: JobListRow; onAssign: () => void }) {
   const me = useMe();
   const [menuOpen, setMenuOpen] = useState(false);
   const assigned = !!row.current_engineer_id;
+  const purchase = can.purchaseWork(me.role);
+  const open = `${deskBase(me.role)}/jobs/${row.id}/overview`;
   const items: RowMenuItem[] = [
-    { label: 'Open job', icon: IconEye, onSelect: () => navigate(`/p/jobs/${row.id}/overview`) },
-    ...(can.purchaseWork(me.role) && isOpen(row.status)
+    { label: 'Open job', icon: IconEye, onSelect: () => navigate(open) },
+    ...(purchase && isOpen(row.status)
       ? [{ label: assigned ? 'Reassign engineer' : 'Assign engineer', icon: IconUser, onSelect: onAssign }] : []),
-    { label: 'View inward receipt', icon: IconInbox, onSelect: () => navigate(`/p/inward/${row.inward_id}`) },
+    ...(purchase ? [{ label: 'View inward receipt', icon: IconInbox, onSelect: () => navigate(`/p/inward/${row.inward_id}`) }] : []),
     {
       label: 'Copy job ID', icon: IconFilePlus, onSelect: () => {
         navigator.clipboard?.writeText(row.job_number).then(
@@ -185,7 +198,7 @@ function JobRow({ row, onAssign }: { row: JobListRow; onAssign: () => void }) {
     },
   ];
   return (
-    <TR gap={GAP} selected={menuOpen} onClick={() => navigate(`/p/jobs/${row.id}/overview`)} className="!py-[12px]">
+    <TR gap={GAP} selected={menuOpen} onClick={() => navigate(open)} className="!py-[12px]">
       <TD w={COLS.id} kind="id">{row.job_number}</TD>
       <TD grow>
         <div className="flex min-w-0 flex-col items-start gap-[2px] overflow-clip whitespace-nowrap">

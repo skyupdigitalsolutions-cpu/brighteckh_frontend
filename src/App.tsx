@@ -27,6 +27,7 @@ import { QuotesRoutes } from './pages/purchase/quotes/routes';
 import { SalesRoutes } from './pages/sales/routes';
 import { StoresRoutes } from './pages/stores/routes';
 import { AdminRoutes, ManagementRoutes } from './pages/mis/routes';
+import { ManagementDeskRoutes } from './pages/management/routes';
 import { PurchaseQuoteRoutes, SalesEnquiryQuoteRoutes } from './pages/supply/quote/routes';
 import { PurchaseOrderRoutes, SalesOrderRoutes } from './pages/supply/order/routes';
 import { FinanceInvoiceRoutes, PurchaseOutwardRoutes } from './pages/supply/outward/routes';
@@ -138,9 +139,10 @@ export function App() {
               </Route>
             </Route>
 
-            {/* Management — BR-10 MIS (no Figma MIS frames; kit build). */}
+            {/* Management — M-D desk (Overview / Jobs / Quotes, view only) + BR-10 MIS (no Figma MIS frames; kit build). */}
             <Route path="/mg" element={<RequireAuth><RoleGate roles={['MANAGEMENT']} /></RequireAuth>}>
               <Route element={<DesktopShell />}>
+                {ManagementDeskRoutes}
                 {ManagementRoutes}
                 <Route path="*" element={<NotBuiltPage />} />
               </Route>

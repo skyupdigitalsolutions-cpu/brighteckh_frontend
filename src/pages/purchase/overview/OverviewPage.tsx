@@ -5,12 +5,14 @@
 // Data: GET /overview/purchase (usePurchaseOverview) — raw counts only, no targets/denominators. Where Figma draws a
 // target ("4 / 16 today") the card shows what the API supports ("4 verified today"); the progress fill is
 // done / (done + remaining), both real counts from the response (see TASKS below for each card's pair).
+// SeeAll / CardHead / Skel / JobsByStatus / IntakeThisWeek are shared with the Management (MD0) and Stores (STD0) dashboards.
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { IconActivity, IconPlus, IconUsers } from '@tabler/icons-react';
 import { useAuth } from '../../../auth/AuthProvider';
 import { can } from '../../../auth/access';
 import { enumLabel, formatTime } from '../../../lib/format';
+import { greeting, plural } from '../../../lib/greeting';
 import {
   Avatar, Button, cx, EmptyState, ErrorState, errorBody, GlassCard, Ic, PageContent, PageHeader, StateCard,
 } from '../../../ui/desktop';
@@ -22,18 +24,9 @@ import dotAwaiting from '../../../assets/figma/overview/dot-awaiting.svg';
 
 type Ov = PurchaseOverview;
 
-/** "Good morning/afternoon/evening, <first name>" from the signed-in employee (GET /auth/me) and the local clock. */
-function greeting(fullName: string | undefined, now = new Date()) {
-  const h = now.getHours();
-  const part = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-  const first = fullName?.trim().split(/\s+/)[0];
-  return first ? `${part}, ${first}` : part;
-}
-
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 // "See all" (177:102631): PillButton look, rendered as a router link.
-function SeeAll({ to }: { to: string }) {
+export function SeeAll({ to }: { to: string }) {
   return (
     <Link
       to={to}
@@ -44,7 +37,7 @@ function SeeAll({ to }: { to: string }) {
   );
 }
 
-function CardHead({ title, right }: { title: string; right?: ReactNode }) {
+export function CardHead({ title, right }: { title: string; right?: ReactNode }) {
   return (
     <div className="flex w-full shrink-0 items-center gap-[12px] overflow-clip">
       <h2 className="min-w-px flex-1 text-[20px] font-semibold leading-[28px] text-fg">{title}</h2>
@@ -54,7 +47,7 @@ function CardHead({ title, right }: { title: string; right?: ReactNode }) {
 }
 
 /** Loading placeholder bar. */
-function Skel({ w, h = 14, dark }: { w: number | string; h?: number; dark?: boolean }) {
+export function Skel({ w, h = 14, dark }: { w: number | string; h?: number; dark?: boolean }) {
   return <span className={cx('block shrink-0 animate-pulse rounded-[6px]', dark ? 'bg-dash-skeleton' : 'bg-disabled')} style={{ width: w, height: h }} aria-hidden />;
 }
 
@@ -184,7 +177,7 @@ function Rings({ shares }: { shares: number[] | null }) {
 
 const pctText = (n: number, total: number) => `${total > 0 ? Math.round((n / total) * 100) : 0}%`;
 
-function JobsByStatus({ o }: { o?: Ov }) {
+export function JobsByStatus({ o, title = 'Jobs by status', to = '/p/jobs' }: { o?: Ov; title?: string; to?: string }) {
   const all = o?.jobs_by_status ?? [];
   const counts = new Map(all.map((s) => [s.status, s.count]));
   const total = all.reduce((s, x) => s + x.count, 0);
@@ -194,9 +187,9 @@ function JobsByStatus({ o }: { o?: Ov }) {
   const others = all.filter((s) => !LEGEND.some((l) => l.status === s.status) && s.count > 0);
   const otherCount = others.reduce((s, x) => s + x.count, 0);
   return (
-    <Link to="/p/jobs" className="glass flex w-[484px] shrink-0 flex-col items-start gap-[20px] self-stretch overflow-clip rounded-t-card p-[24px]">
+    <Link to={to} className="glass flex w-[484px] shrink-0 flex-col items-start gap-[20px] self-stretch overflow-clip rounded-t-card p-[24px]">
       <CardHead
-        title="Jobs by status"
+        title={title}
         right={o
           ? <p className="shrink-0 whitespace-nowrap text-[14px] leading-[20px] text-fg-2">{plural(total, 'open job', 'open jobs')}</p>
           : <Skel w={90} />}
@@ -227,10 +220,10 @@ function JobsByStatus({ o }: { o?: Ov }) {
 }
 
 // ------------------------------------------------------------------ Row 2
-function Row2Card({ title, to, gap, children }: { title: string; to: string; gap: number; children: ReactNode }) {
+export function Row2Card({ title, to, gap, children }: { title: string; to: string | null; gap: number; children: ReactNode }) {
   return (
     <GlassCard className="flex h-full min-w-px flex-1 flex-col items-start p-[24px]" style={{ gap }}>
-      <CardHead title={title} right={<SeeAll to={to} />} />
+      <CardHead title={title} right={to ? <SeeAll to={to} /> : undefined} />
       {children}
     </GlassCard>
   );
@@ -244,12 +237,12 @@ const DAYS: { wd: Weekday; label: string }[] = [ // working days Mon–Sat (clie
 
 // Bars (177:102673): per day a pair of 20-wide, radius-10 bars (gap 6) — received #da4a3c, verified #8a8a92 — over a
 // 12/16 muted day label (gap 8). Heights scale to the week's largest value (the tallest bar fills the bar area).
-function IntakeThisWeek({ o }: { o?: Ov }) {
+export function IntakeThisWeek({ o, to = '/p/inward', note }: { o?: Ov; to?: string | null; note?: ReactNode }) {
   const days = o?.intake_this_week ?? [];
   const max = Math.max(0, ...days.flatMap((d) => [d.units_received, d.units_verified]));
   const h = (n: number) => (max > 0 ? `${(n / max) * 100}%` : '0%');
   return (
-    <Row2Card title="Intake this week" to="/p/inward" gap={20}>
+    <Row2Card title="Intake this week" to={to} gap={20}>
       <div className="flex w-full shrink-0 items-start justify-end gap-[16px] overflow-clip">
         <div className="flex items-center gap-[6px] overflow-clip">
           <span className="h-[12px] w-[12px] shrink-0 rounded-[3px] bg-brand-logo" aria-hidden />
@@ -291,6 +284,7 @@ function IntakeThisWeek({ o }: { o?: Ov }) {
           <p className="absolute inset-x-0 top-[40%] text-center text-[14px] leading-[20px] text-fg-2">No units received or verified this week yet</p>
         )}
       </div>
+      {note}
     </Row2Card>
   );
 }

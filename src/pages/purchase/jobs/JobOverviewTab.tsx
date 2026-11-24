@@ -16,6 +16,11 @@
 // GET /jobs/{id}/inspection-sessions; other actor names (verifier, reviewers) = GET /lookups/employees?ids=.
 // Stepper labels are the API's stage labels (Figma draws Repair / Test / Dispatch; the API has PO & GRN /
 // Repair & test / Dispatch & invoice). A stage's status, `at`, `detail` and `rule` are its native tooltip.
+//
+// MANAGEMENT (MJ1 · Job (view) 177:140458, /mg/jobs/:jobId/overview): same cards, read-only — no Assign / Review report /
+// View inward receipt actions, the gradient card is "CURRENT STEP" (as drawn in MJ1), and the employees lookup
+// (PURCHASE-only) is not called: actors named by GET /jobs/{id}/progress still show, others (verifier, report reviewers)
+// show the time only — GapNote G-MJ-2.
 import { useState, type ReactNode } from 'react';
 import { IconCheck, IconClipboardList, IconInbox, IconUser } from '@tabler/icons-react';
 import { useMe } from '../../../auth/AuthProvider';
@@ -50,7 +55,8 @@ export function JobOverviewTab() {
 
   const report = reportQ.data ?? null;
   const a = job.current_assignment;
-  const canAssign = can.purchaseWork(me.role) && isOpen(job.status);
+  const purchase = can.purchaseWork(me.role);
+  const canAssign = purchase && isOpen(job.status);
   const stages = progressQ.data?.stages;
   // A pending stage before a done one = no record for it (e.g. no supplier PO because stock covered it).
   const lastDone = stages ? stages.map((x) => x.status).lastIndexOf('done') : -1;
@@ -84,7 +90,7 @@ export function JobOverviewTab() {
       {/* Columns 177:116137 */}
       <div className="flex min-h-px w-full flex-1 items-stretch gap-[20px]">
         <div className="flex min-w-px flex-1 flex-col items-start gap-[20px]">
-          <UnitCard ws={ws} />
+          <UnitCard ws={ws} purchase={purchase} />
           <HistoryCard
             job={job}
             verifiedById={unit?.verified_by_id ?? null}
@@ -95,10 +101,11 @@ export function JobOverviewTab() {
             assignments={progressQ.data?.assignments}
             stages={stages}
             loading={reportQ.isPending || sessionsQ.isPending || progressQ.isPending || !receipt}
+            purchase={purchase}
           />
         </div>
         <div className="flex w-[420px] shrink-0 flex-col items-start gap-[20px]">
-          <NextStepCard job={job} report={report} loading={reportQ.isPending} canAssign={canAssign} onAssign={() => setDrawer(true)} />
+          <NextStepCard job={job} report={report} loading={reportQ.isPending} canAssign={canAssign} purchase={purchase} onAssign={() => setDrawer(true)} />
           <AssignmentCard job={job} engineerName={engineerName} canAssign={canAssign} onAssign={() => setDrawer(true)} />
           <TimeCard sessionsQ={sessionsQ} />
         </div>
@@ -185,7 +192,7 @@ const Skel = ({ w }: { w: number }) => <span className="my-[4px] block h-[12px] 
 
 type WS = ReturnType<typeof useJobWorkspace>;
 
-function UnitCard({ ws }: { ws: WS }) {
+function UnitCard({ ws, purchase }: { ws: WS; purchase: boolean }) {
   const { job, receipt, unit, unitsInGroup, customer, customerLoading } = ws;
   const loading = !receipt;
   const v = (x: string | null | undefined) => (loading ? <Skel w={110} /> : x?.trim() || '—');
@@ -193,7 +200,7 @@ function UnitCard({ ws }: { ws: WS }) {
     <section className={card}>
       <div className="flex w-full items-center gap-[10px] overflow-clip">
         <h2 className={h2}>Unit as received</h2>
-        <ButtonLink to={`/p/inward/${job.inward_id}`} kind="secondary" icon={<Ic icon={IconInbox} size={18} />}>View inward receipt</ButtonLink>
+        {purchase && <ButtonLink to={`/p/inward/${job.inward_id}`} kind="secondary" icon={<Ic icon={IconInbox} size={18} />}>View inward receipt</ButtonLink>}
       </div>
       <div className="flex w-full items-start gap-[40px] overflow-clip">
         <KV label="Customer">{loading || customerLoading ? <Skel w={140} /> : customer?.customer_name ?? '—'}</KV>
@@ -224,7 +231,7 @@ const LATER_STAGES = new Set<JobProgressStage['key']>(['MATERIAL', 'QUOTE', 'AUT
 type AssignmentEvt = Pick<JobAssignmentHistoryRow,
   'engineer_id' | 'assigned_by_id' | 'assigned_at' | 'response' | 'responded_at' | 'response_reason' | 'reassignment_reason'>;
 
-function HistoryCard({ job, verifiedById, engineerName, report, reportQ, sessionsQ, assignments, stages, loading }: {
+function HistoryCard({ job, verifiedById, engineerName, report, reportQ, sessionsQ, assignments, stages, loading, purchase }: {
   job: Job;
   verifiedById: string | null;
   engineerName: string | null;
@@ -235,6 +242,8 @@ function HistoryCard({ job, verifiedById, engineerName, report, reportQ, session
   assignments: JobAssignmentHistoryRow[] | undefined;
   stages: JobProgressStage[] | undefined;
   loading: boolean;
+  /** false = Management: GET /lookups/employees is PURCHASE-only, so it is not called. */
+  purchase: boolean;
 }) {
   const sessions: InspectionSessions['sessions'] = sessionsQ.data?.sessions ?? [];
   // Names: engineers + assigners from progress; anyone else (verifier, reviewers, an engineer not in that history)
@@ -249,7 +258,7 @@ function HistoryCard({ job, verifiedById, engineerName, report, reportQ, session
     ...sessions.map((x) => x.engineer_id),
     ...(assignments ? [] : job.current_assignment ? [job.current_assignment.assigned_by_id] : []),
   ].filter((x): x is string => !!x && !names[x]);
-  const empQ = useEmployeesByIds(wanted);
+  const empQ = useEmployeesByIds(purchase ? wanted : []);
   const nameOf = (id: string | null | undefined) => (id ? names[id] ?? empQ.data?.[id]?.full_name ?? null : null);
 
   const ev: Event[] = [{ at: job.created_at, title: 'Unit verified · job created', actor: nameOf(verifiedById), tone: 'success' }];
@@ -323,12 +332,15 @@ function HistoryCard({ job, verifiedById, engineerName, report, reportQ, session
           {loading && <li className="flex w-full flex-col gap-[8px] pl-[24px]"><Skel w={220} /><Skel w={120} /></li>}
         </ol>
       )}
+      {!purchase && wanted.length > 0 && (
+        <GapNote code="G-MJ-2">Some entries show no name: the employee lookup that names the verifier and report reviewers is Purchase-only.</GapNote>
+      )}
     </section>
   );
 }
 
-function NextStepCard({ job, report, loading, canAssign, onAssign }: {
-  job: Job; report: InspectionReport | null; loading: boolean; canAssign: boolean; onAssign: () => void;
+function NextStepCard({ job, report, loading, canAssign, purchase, onAssign }: {
+  job: Job; report: InspectionReport | null; loading: boolean; canAssign: boolean; purchase: boolean; onAssign: () => void;
 }) {
   const a = job.current_assignment;
   const latest = report?.versions[report.versions.length - 1];
@@ -351,7 +363,7 @@ function NextStepCard({ job, report, loading, canAssign, onAssign }: {
     title = `Review inspection report v${displayVersion(latest.version_no)}`;
     const wait = formatWaiting(latest.submitted_at);
     detail = [latest.outcome && `Outcome ${enumLabel(latest.outcome)}`, wait && `waiting ${wait}`].filter(Boolean).join(' · ');
-    action = <ButtonLink to={`/p/jobs/${job.id}/inspection`} kind="primary" className="w-full" icon={<Ic icon={IconClipboardList} size={18} />}>Review report</ButtonLink>;
+    if (purchase) action = <ButtonLink to={`/p/jobs/${job.id}/inspection`} kind="primary" className="w-full" icon={<Ic icon={IconClipboardList} size={18} />}>Review report</ButtonLink>;
   } else if (report.status === 'ACCEPTED') {
     title = `Inspection report v${displayVersion(latest.version_no)} accepted`;
     detail = report.latest_outcome ? `Outcome ${enumLabel(report.latest_outcome)}` : null;
@@ -364,7 +376,7 @@ function NextStepCard({ job, report, loading, canAssign, onAssign }: {
       className="flex w-full shrink-0 flex-col items-start gap-[16px] overflow-clip rounded-[24px] border border-glass-border p-[24px] backdrop-blur-[12px]"
       style={{ backgroundImage: 'linear-gradient(155.43282867939868deg, rgba(218, 74, 60, 0.32) 14.286%, rgba(218, 74, 60, 0.08) 85.714%)' }}
     >
-      <p className="whitespace-nowrap text-[11px] font-semibold leading-[14px] tracking-[0.44px] text-fg-2">NEXT STEP</p>
+      <p className="whitespace-nowrap text-[11px] font-semibold leading-[14px] tracking-[0.44px] text-fg-2">{purchase ? 'NEXT STEP' : 'CURRENT STEP'}</p>
       <h2 className="text-[18px] font-semibold leading-[24px] text-fg">{title}</h2>
       {detail && <p className="text-[14px] leading-[20px] text-fg-2">{detail}</p>}
       {action && <div className="flex w-full [&>*]:w-full">{action}</div>}
