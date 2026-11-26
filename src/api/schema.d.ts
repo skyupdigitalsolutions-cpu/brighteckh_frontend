@@ -1809,7 +1809,7 @@ export interface paths {
         };
         get: operations["Br08Controller_list"];
         put?: never;
-        /** Issue a tax invoice (immutable). Lines = authorised quote; GST from place of supply; D6 gate. */
+        /** Issue a tax invoice (immutable). Lines = authorised quote; GST from place of supply; D6 gate. One invoice per dispatch: all jobs from one dispatch batch. */
         post: operations["Br08Controller_issue"];
         delete?: never;
         options?: never;
@@ -2073,6 +2073,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/company-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's company policy config (discount threshold, return windows, freight payer, follow-up, extra authorisers) */
+        get: operations["CompanyConfigController_get"];
+        /** Set company policy fields. Omitted = unchanged, null = clear. Only max_discount_percent is enforced. */
+        put: operations["CompanyConfigController_set"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/support-cases": {
         parameters: {
             query?: never;
@@ -2234,7 +2252,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Separate review of a REPLACEMENT / REFUND_REVIEW decision by the CONFIGURED role. Approved refund -> Finance credit-note request. */
+        /** Separate review of a REPLACEMENT / REFUND_REVIEW decision by the CONFIGURED role (REPLACEMENT uses REPLACEMENT_APPROVAL when set, else REFUND_REPLACEMENT_REVIEW). Approved refund -> Finance credit-note request. */
         post: operations["Br09Controller_refundReplacementReview"];
         delete?: never;
         options?: never;
@@ -2434,7 +2452,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Assign (or clear) the approver role for CLAIM_DECISION / GOODWILL_APPROVAL -- CLIENT-UNCONFIRMED */
+        /** Assign (or clear) the approver role for CLAIM_DECISION / GOODWILL_APPROVAL / REFUND_REPLACEMENT_REVIEW / REPLACEMENT_APPROVAL */
         put: operations["Br09Controller_setAuthority"];
         post?: never;
         delete?: never;
@@ -8637,6 +8655,95 @@ export interface components {
             /** @example Christmas */
             description: string;
         };
+        CompanyPolicyConfigRow: {
+            /** Format: uuid */
+            company_id: string;
+            /**
+             * Format: decimal
+             * @description numeric, returned as decimal string
+             */
+            max_discount_percent: string | null;
+            customer_return_window_days: number | null;
+            supplier_return_window_min_days: number | null;
+            supplier_return_window_max_days: number | null;
+            /** @enum {string|null} */
+            return_freight_payer: "CUSTOMER" | "COMPANY" | null;
+            quote_followup_days: number | null;
+            rma_turnaround_target_working_days: number | null;
+            /** @enum {string|null} */
+            customer_return_authority_role: "PURCHASE" | "ENGINEER" | "SALES" | "STORES_QUALITY" | "EXTERNAL_COORD" | "FINANCE" | "MANAGEMENT" | "SYSTEM_ADMIN" | null;
+            /** @enum {string|null} */
+            supplier_refund_authority_role: "PURCHASE" | "ENGINEER" | "SALES" | "STORES_QUALITY" | "EXTERNAL_COORD" | "FINANCE" | "MANAGEMENT" | "SYSTEM_ADMIN" | null;
+            /** @enum {string|null} */
+            kpi_signoff_authority_role: "PURCHASE" | "ENGINEER" | "SALES" | "STORES_QUALITY" | "EXTERNAL_COORD" | "FINANCE" | "MANAGEMENT" | "SYSTEM_ADMIN" | null;
+            note: string | null;
+            /** Format: uuid */
+            updated_by_id: string | null;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        CompanyConfigResponse: {
+            policy: components["schemas"]["CompanyPolicyConfigRow"] | null;
+            /**
+             * @description The BR-04 discount threshold in force (config, else 10)
+             * @example 5
+             */
+            effective_max_discount_percent: string;
+            /** @description Fields a server rule reads */
+            enforced: string[];
+            /** @description Fields recorded for reference only: no workflow consumes them yet */
+            stored_only: string[];
+        };
+        CompanyPolicyDto: {
+            /**
+             * @description ENFORCED (BR-04): a quote revision more than this % below the original authorised price needs a named approver + reason. null = 10% (pre-026 default).
+             * @example 5
+             */
+            max_discount_percent?: number | null;
+            /**
+             * @description Stored only (no return workflow yet)
+             * @example 15
+             */
+            customer_return_window_days?: number | null;
+            /**
+             * @description Stored only
+             * @example 15
+             */
+            supplier_return_window_min_days?: number | null;
+            /**
+             * @description Stored only
+             * @example 20
+             */
+            supplier_return_window_max_days?: number | null;
+            /**
+             * @description Stored only
+             * @enum {string|null}
+             */
+            return_freight_payer?: "CUSTOMER" | "COMPANY" | null;
+            /**
+             * @description Stored only (no follow-up reminders yet)
+             * @example 5
+             */
+            quote_followup_days?: number | null;
+            /** @description Stored only. RMA turnaround target in working days; unset until the client fixes one. */
+            rma_turnaround_target_working_days?: number | null;
+            /**
+             * @description Stored only: customer return (RMA) authoriser
+             * @enum {string|null}
+             */
+            customer_return_authority_role?: "PURCHASE" | "ENGINEER" | "SALES" | "STORES_QUALITY" | "EXTERNAL_COORD" | "FINANCE" | "MANAGEMENT" | "SYSTEM_ADMIN" | null;
+            /**
+             * @description Stored only: supplier refund / AP authoriser (no AP module)
+             * @enum {string|null}
+             */
+            supplier_refund_authority_role?: "PURCHASE" | "ENGINEER" | "SALES" | "STORES_QUALITY" | "EXTERNAL_COORD" | "FINANCE" | "MANAGEMENT" | "SYSTEM_ADMIN" | null;
+            /**
+             * @description Stored only: management KPI sign-off (no KPI validation workflow)
+             * @enum {string|null}
+             */
+            kpi_signoff_authority_role?: "PURCHASE" | "ENGINEER" | "SALES" | "STORES_QUALITY" | "EXTERNAL_COORD" | "FINANCE" | "MANAGEMENT" | "SYSTEM_ADMIN" | null;
+            note?: string;
+        };
         RegisterCaseDto: {
             customer_id: string;
             /** @enum {string} */
@@ -9155,7 +9262,7 @@ export interface components {
         };
         SupportAuthorityStatus: {
             /** @enum {string} */
-            decision_kind: "CLAIM_DECISION" | "GOODWILL_APPROVAL";
+            decision_kind: "CLAIM_DECISION" | "GOODWILL_APPROVAL" | "REFUND_REPLACEMENT_REVIEW" | "REPLACEMENT_APPROVAL";
             approver_role_code: string | null;
             /** @example CLIENT-UNCONFIRMED (decisions blocked) */
             status: string;
@@ -9184,7 +9291,7 @@ export interface components {
         };
         AuthorityConfigDto: {
             /** @enum {string} */
-            decision_kind: "CLAIM_DECISION" | "GOODWILL_APPROVAL" | "REFUND_REPLACEMENT_REVIEW";
+            decision_kind: "CLAIM_DECISION" | "GOODWILL_APPROVAL" | "REFUND_REPLACEMENT_REVIEW" | "REPLACEMENT_APPROVAL";
             /**
              * @description null = unassign (decisions blocked again)
              * @enum {string|null}
@@ -9603,13 +9710,15 @@ export interface components {
             updated_by_id: string;
             /** Format: date-time */
             updated_at: string;
+            /** @enum {string|null} */
+            advance_policy: "NONE" | "PER_ORDER" | null;
         };
         Br08GstRateConfigRow: {
             /** Format: uuid */
             id: string;
             /** @enum {string|null} */
             quote_line_type: "REPAIR_SERVICE" | "MATERIAL" | "LABOUR" | "INSPECTION" | "TESTING" | "EXTERNAL" | "FREIGHT" | "OTHER" | "PRODUCT_SALE" | null;
-            hsn_sac: string;
+            hsn_sac: string | null;
             /**
              * Format: decimal
              * @description numeric, returned as decimal string
@@ -9649,6 +9758,11 @@ export interface components {
             invoice_trigger?: "ADVANCE" | "DISPATCH" | "DELIVERY" | "MILESTONE" | null;
             /** @description 11C-09 full payment before closure. null = unconfigured = closure BLOCKED. */
             requires_full_payment_for_closure?: boolean | null;
+            /**
+             * @description 11B-02 company advance policy (026). NONE = an order with no recorded payment terms needs no advance; terms recorded on an order still apply. null / PER_ORDER = terms must be recorded before reservation / sourcing.
+             * @enum {string|null}
+             */
+            advance_policy?: "NONE" | "PER_ORDER" | null;
             note?: string;
         };
         EnquiryLineDto: {
@@ -11735,7 +11849,7 @@ export interface components {
             payment_terms_recorded: boolean;
             /** @enum {string|null} */
             advance_kind: "NOT_REQUIRED" | "FIXED_AMOUNT" | "PERCENTAGE" | "FULL" | null;
-            /** @description advance_kind NOT_REQUIRED, or Finance confirmed the advance (finance_confirmed_at set) */
+            /** @description advance_kind NOT_REQUIRED, or Finance confirmed the advance (finance_confirmed_at set), or no terms recorded and the company advance_policy is NONE */
             advance_cleared: boolean;
             /**
              * Format: int64
@@ -20892,6 +21006,111 @@ export interface operations {
             };
         };
     };
+    CompanyConfigController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyConfigResponse"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    CompanyConfigController_set: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyPolicyDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompanyConfigResponse"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: SYSTEM_ADMIN */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     Br09Controller_list: {
         parameters: {
             query?: {
@@ -21517,7 +21736,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Caller lacks the role configured for REFUND_REPLACEMENT_REVIEW */
+            /** @description Caller lacks the role configured for REFUND_REPLACEMENT_REVIEW / REPLACEMENT_APPROVAL */
             403: {
                 headers: {
                     [name: string]: unknown;
