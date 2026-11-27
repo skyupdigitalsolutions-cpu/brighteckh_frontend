@@ -11,19 +11,26 @@
 // spacer, "Preview doesn't consume an INV number." (12/16 muted), Gated action.
 // API over Figma: the blocked frames draw the order lines; the API returns only the refusal for a blocked preview, so the
 // blocked card shows the reason, not lines. "(example)" labels are dropped — values are real.
-import { useRef } from 'react';
+// Configured state (Settings, 27 Nov 2026): G13 (GST rate source) and G18 / G19 are answered, so the open-question notes
+// are gone. Still not in the backend (pending product-owner decision):
+// - G19 cash bill (non-GST) for a customer without GSTIN — 247:52979 is drawn as the designed cash-bill state (badges,
+//   "GST Not applicable", Bill to "Not registered") but the server still refuses and has no non-GST bill type, so there
+//   are no lines and no "Issue cash bill" action: a GapNote says so.
+// - G18 one invoice per dispatch: not enforced; the preview covers every invoiceable line (GapNote).
+// HSN missing (53267) stays BLOCKED with the server reason.
+import { useRef, type ReactNode } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { IconAlertTriangle } from '@tabler/icons-react';
+import { IconAlertTriangle, IconInfoCircle } from '@tabler/icons-react';
 import { apiErrorText, apiStatus } from '../../../../api/http';
 import { enumLabel, formatDate, formatQty } from '../../../../lib/format';
 import {
-  Badge, ErrorState, FormErrors, GatedAction, InlineAlert, PageContent, PageHeader, StateCard, errorBody,
+  Badge, ErrorState, FormErrors, GapNote, GatedAction, Ic, InlineAlert, PageContent, PageHeader, StateCard, errorBody,
 } from '../../../../ui/desktop';
 import {
   newIdempotencyKey, supplyApi, useSupplyMutation, type InvoicePreview, type InvoiceQueueRow,
 } from '../../api';
-import { Bars, CardHead, KVBox, OpenQuestion, PanelHead, SplitCard } from '../ui';
+import { Bars, CardHead, KVBox, PanelHead, SplitCard } from '../ui';
 import { InvoiceLinesTable, TaxTotals, type InvoiceLineView } from './parts';
 
 type PreviewLine = {
@@ -89,8 +96,8 @@ function Ready({ title, p, row }: { title: string; p: InvoicePreview; row: Invoi
             <CardHead right={<><Badge tone="neutral" label="PREVIEW" /><Badge tone="neutral" label={enumLabel(p.tax_regime)} /></>}>Preview · no number consumed</CardHead>
             <InvoiceLinesTable lines={lines} />
             <TaxTotals regime={p.tax_regime} lines={lines} sub={String(p.sub_total_paise)} cgst={String(p.cgst_paise)} sgst={String(p.sgst_paise)} igst={String(p.igst_paise)} total={String(p.total_paise)} words={p.total_in_words} />
-            <OpenQuestion code="G13">whether the GST rate is per company, per HSN or per item is not decided.</OpenQuestion>
-            <OpenQuestion code="G18">one invoice per dispatch vs one combined invoice per order is not decided — this preview covers every invoiceable line of {p.sales_order_number} under the {p.invoice_trigger} trigger.</OpenQuestion>
+            <InfoNote>Product GST rate from Admin › Settings › Company & tax; HSN comes from each item (Stock › Items).</InfoNote>
+            <GapNote code="G18">One invoice per dispatch isn't enforced by the backend yet: this preview covers every invoiceable line of {p.sales_order_number} under the {p.invoice_trigger} trigger.</GapNote>
           </SplitCard>
           <SplitCard className="w-[420px] shrink-0">
             <PanelHead>Bill to</PanelHead>
@@ -122,17 +129,17 @@ function Ready({ title, p, row }: { title: string; p: InvoicePreview; row: Invoi
 
 function Blocked({ title, row, reason }: { title: string; row: InvoiceQueueRow | null; reason: string }) {
   const gstin = /GSTIN/i.test(reason);
+  if (gstin) return <CashBill title={title} row={row} reason={reason} />;
   const rate = /HSN|GST rate|PRODUCT_SALE/i.test(reason);
   return (
     <>
-      <PageHeader title={title} meta={[row?.customer_name, gstin ? 'customer has no GSTIN' : rate ? 'HSN / GST rate missing' : 'invoice blocked'].filter(Boolean).join(' · ')} />
+      <PageHeader title={title} meta={[row?.customer_name, rate ? 'HSN / GST rate missing' : 'invoice blocked'].filter(Boolean).join(' · ')} />
       <PageContent className="min-h-[808px]">
         <div className="flex min-h-[640px] w-full flex-1 items-stretch gap-[20px]">
           <SplitCard pad={22} className="min-w-px flex-1">
             <CardHead right={<><Badge tone="neutral" label="PREVIEW" /><Badge tone="blocked" label="BLOCKED" /></>}>Preview · no number consumed</CardHead>
             <InlineAlert tone="blocked" icon={IconAlertTriangle} title="The server won't build this invoice">{reason}</InlineAlert>
-            {gstin && <OpenQuestion code="G19">tax regime and invoice format for a customer without GSTIN (B2C / unregistered) is not decided.</OpenQuestion>}
-            {rate && <OpenQuestion code="G13">whether the GST rate / HSN is per company, per HSN or per item is not decided.</OpenQuestion>}
+            {rate && <InfoNote>Set the HSN on the item in Stock › Items. The product GST rate is set in Admin › Settings › Company & tax.</InfoNote>}
           </SplitCard>
           <SplitCard className="w-[420px] shrink-0">
             <PanelHead>Bill to</PanelHead>
@@ -147,6 +154,47 @@ function Blocked({ title, row, reason }: { title: string; row: InvoiceQueueRow |
         </div>
       </PageContent>
     </>
+  );
+}
+
+/** FI1 cash bill 247:52979 — designed state for a customer without GSTIN; the backend has no non-GST bill type yet. */
+function CashBill({ title, row, reason }: { title: string; row: InvoiceQueueRow | null; reason: string }) {
+  return (
+    <>
+      <PageHeader title={title} meta={[row?.customer_name, 'no GSTIN → cash bill (non-GST)'].filter(Boolean).join(' · ')} />
+      <PageContent className="min-h-[808px]">
+        <div className="flex min-h-[640px] w-full flex-1 items-stretch gap-[20px]">
+          <SplitCard pad={22} className="min-w-px flex-1">
+            <CardHead right={<><Badge tone="neutral" label="PREVIEW" /><Badge tone="neutral" label="CASH BILL · NON-GST" /></>}>Cash bill preview · no number consumed</CardHead>
+            <div className="flex w-full items-center justify-end gap-[16px] text-[14px] leading-[20px]">
+              <span className="text-fg-2">GST</span><span className="font-mono text-fg">Not applicable</span>
+            </div>
+            <InfoNote>Customers without GSTIN get a cash bill (non-GST) — Admin › Settings › Policies.</InfoNote>
+            <GapNote code="G19">The non-GST cash bill isn't in the backend yet, so the bill lines and total can't be built and it can't be issued. Server: {reason}</GapNote>
+          </SplitCard>
+          <SplitCard className="w-[420px] shrink-0">
+            <PanelHead>Bill to</PanelHead>
+            <KVBox rows={[
+              ['Customer', row?.customer_name ?? '—'],
+              ['GSTIN', 'Not registered'],
+              ['Place of supply', '—'],
+              ['Order', row?.sales_order_number ?? '—'],
+              ...(row?.trigger_event_ref ? [['Outward', row.trigger_event_ref] as [string, string]] : []),
+            ]} />
+            <div className="min-h-px w-px flex-1" />
+          </SplitCard>
+        </div>
+      </PageContent>
+    </>
+  );
+}
+
+function InfoNote({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex w-full items-center gap-[8px] overflow-clip rounded-[12px] bg-subtle px-[12px] py-[10px]">
+      <Ic icon={IconInfoCircle} size={16} className="shrink-0 text-fg-2" />
+      <p className="min-w-px flex-1 text-[12px] leading-[16px] text-fg-2">{children}</p>
+    </div>
   );
 }
 

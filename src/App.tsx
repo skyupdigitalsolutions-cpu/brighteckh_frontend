@@ -32,6 +32,7 @@ import { PurchaseQuoteRoutes, SalesEnquiryQuoteRoutes } from './pages/supply/quo
 import { PurchaseOrderRoutes, SalesOrderRoutes } from './pages/supply/order/routes';
 import { FinanceInvoiceRoutes, PurchaseOutwardRoutes } from './pages/supply/outward/routes';
 import { AdminSalesPolicyRoutes, FinanceAdvanceRoutes } from './pages/supply/finance-admin/routes';
+import { AdminSettingsRoutes } from './pages/admin-settings/SettingsLayout';
 import { MyJobsPage } from './pages/engineer/MyJobsPage';
 import { JobDetailPage } from './pages/engineer/JobDetailPage';
 import { InspectPage } from './pages/engineer/InspectPage';
@@ -148,11 +149,12 @@ export function App() {
               </Route>
             </Route>
 
-            {/* SYSTEM_ADMIN — BR-10 RBAC admin (role bindings, report grants) + reports. */}
+            {/* SYSTEM_ADMIN — BR-10 RBAC admin (role bindings, report grants) + reports, BR-11 sales policy, Settings (AST-D). */}
             <Route path="/a" element={<RequireAuth><RoleGate roles={['SYSTEM_ADMIN']} /></RequireAuth>}>
               <Route element={<DesktopShell />}>
                 {AdminRoutes}
                 {AdminSalesPolicyRoutes}
+                {AdminSettingsRoutes}
                 <Route path="*" element={<NotBuiltPage />} />
               </Route>
             </Route>

@@ -3999,6 +3999,193 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/settings/companies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Companies the Settings switcher can open */
+        get: operations["AdminSettingsController_companies"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/settings/companies/{companyId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One company's settings: profile, authorisers, policies, calendar (+ global GST rates and test SLA), last saved per tab */
+        get: operations["AdminSettingsController_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/settings/companies/{companyId}/numbering": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Document number series: format, latest and next number (read-only; numbers are assigned by the DB) */
+        get: operations["AdminSettingsController_numbering"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/settings/companies/{companyId}/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Company & tax: legal name, Udyam, GSTIN, state, address, document prefix, bank. Prefix/state/GSTIN freeze once BR-08 documents exist. */
+        put: operations["AdminSettingsController_setProfile"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/settings/companies/{companyId}/authorisers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Authorisers: BR-09 decision roles, BR-10 grant approvers, return / refund / KPI roles */
+        put: operations["AdminSettingsController_setAuthorisers"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/settings/companies/{companyId}/policies": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Policies: company policy fields and the BR-11 sales policy */
+        put: operations["AdminSettingsController_setPolicies"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/settings/companies/{companyId}/working-hours": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Calendar: replace the per-weekday working hours (+ lunch break). Weekdays not listed are non-working. */
+        put: operations["AdminSettingsController_setWorkingHours"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/settings/companies/{companyId}/holidays": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Calendar: add a holiday */
+        post: operations["AdminSettingsController_addHoliday"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/settings/companies/{companyId}/holidays/{holidayId}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Calendar: remove a future holiday (past holidays are kept) */
+        post: operations["AdminSettingsController_removeHoliday"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/settings/gst-rates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** GLOBAL: set the GST rate (and HSN/SAC) for a quote line type. Replaces the active row; history kept. */
+        put: operations["AdminSettingsController_setGstRate"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/settings/test-sla-targets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** GLOBAL: BR-07 test-start SLA for one job priority */
+        put: operations["AdminSettingsController_setTestSla"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -7493,20 +7680,25 @@ export interface components {
             id: string;
             entity_code: string;
             name: string;
-            legal_name: Record<string, never>;
+            legal_name: string | null;
             /** @example BIAPL */
-            doc_prefix: Record<string, never>;
-            gstin: Record<string, never>;
+            doc_prefix: string | null;
+            gstin: string | null;
             /** @example 29 */
-            state_code: Record<string, never>;
+            state_code: string | null;
             /** @example Karnataka */
-            state_name: Record<string, never>;
-            registered_address: Record<string, never>;
-            bank_account_name: Record<string, never>;
-            bank_name: Record<string, never>;
-            bank_account_no: Record<string, never>;
-            bank_ifsc: Record<string, never>;
-            bank_branch: Record<string, never>;
+            state_name: string | null;
+            registered_address: string | null;
+            bank_account_name: string | null;
+            bank_name: string | null;
+            bank_account_no: string | null;
+            bank_ifsc: string | null;
+            bank_branch: string | null;
+            /**
+             * @description MSME Udyam registration (027). Stored only.
+             * @example UDYAM-KR-03-0012345
+             */
+            udyam_number: string | null;
         };
         EntityProfileDto: {
             /** @example BIAPL */
@@ -8681,6 +8873,8 @@ export interface components {
             updated_by_id: string | null;
             /** Format: date-time */
             updated_at: string;
+            /** @enum {string|null} */
+            supplier_return_authority_role: "PURCHASE" | "ENGINEER" | "SALES" | "STORES_QUALITY" | "EXTERNAL_COORD" | "FINANCE" | "MANAGEMENT" | "SYSTEM_ADMIN" | null;
         };
         CompanyConfigResponse: {
             policy: components["schemas"]["CompanyPolicyConfigRow"] | null;
@@ -8742,6 +8936,11 @@ export interface components {
              * @enum {string|null}
              */
             kpi_signoff_authority_role?: "PURCHASE" | "ENGINEER" | "SALES" | "STORES_QUALITY" | "EXTERNAL_COORD" | "FINANCE" | "MANAGEMENT" | "SYSTEM_ADMIN" | null;
+            /**
+             * @description Stored only: supplier return authoriser (027; no supplier-return workflow)
+             * @enum {string|null}
+             */
+            supplier_return_authority_role?: "PURCHASE" | "ENGINEER" | "SALES" | "STORES_QUALITY" | "EXTERNAL_COORD" | "FINANCE" | "MANAGEMENT" | "SYSTEM_ADMIN" | null;
             note?: string;
         };
         RegisterCaseDto: {
@@ -12517,6 +12716,180 @@ export interface components {
             bom_revision: number | null;
             /** @description Lines of bom_revision, by item_code */
             bom: components["schemas"]["StockBomLine"][];
+        };
+        AdminCompanyRow: {
+            /** Format: uuid */
+            id: string;
+            /** @example BLR */
+            entity_code: string;
+            name: string;
+            legal_name: string | null;
+            is_active: boolean;
+        };
+        TestSlaTarget: {
+            /** @enum {string} */
+            priority: "NORMAL" | "URGENT" | "CRITICAL";
+            target_amount: number;
+            /** @enum {string} */
+            target_unit: "WORKING_HOUR" | "WORKING_DAY";
+            /** @example BR07_TEST_START */
+            event_code: string;
+        };
+        SavedStamp: {
+            /** Format: date-time */
+            at: string;
+            /** Format: uuid */
+            by_id: string;
+            by_name: string;
+        };
+        SettingsLastSaved: {
+            COMPANY_TAX: components["schemas"]["SavedStamp"] | null;
+            AUTHORISERS: components["schemas"]["SavedStamp"] | null;
+            POLICIES: components["schemas"]["SavedStamp"] | null;
+            CALENDAR: components["schemas"]["SavedStamp"] | null;
+        };
+        AdminCompanySettings: {
+            company: components["schemas"]["AdminCompanyRow"];
+            profile: components["schemas"]["EntityProfileResponse"];
+            company_config: components["schemas"]["CompanyConfigResponse"];
+            sales_config: components["schemas"]["SalesConfigResponse"];
+            support_config: components["schemas"]["Br09Config"];
+            mis_authorities: components["schemas"]["AuthorityStatus"][];
+            /** @description null = the company has no active working calendar */
+            calendar: components["schemas"]["CalendarResponse"] | null;
+            /** @description GLOBAL: active GST rate rows (shared by every company) */
+            gst_rates: components["schemas"]["Br08GstRateConfigRow"][];
+            /** @description GLOBAL: BR-07 test-start SLA per job priority (shared by every company) */
+            test_sla_targets: components["schemas"]["TestSlaTarget"][];
+            /** @description Last save from this Settings panel, per tab */
+            last_saved: components["schemas"]["SettingsLastSaved"];
+        };
+        NumberingSeries: {
+            /** @example INV */
+            kind: string;
+            /** @example Tax invoice */
+            label: string;
+            /**
+             * @description FISCAL_YEAR = resets each 1 April; COMPANY = never resets; GLOBAL = one series for all companies
+             * @enum {string}
+             */
+            scope: "FISCAL_YEAR" | "COMPANY" | "GLOBAL";
+            /** @example <PREFIX>/<n>/<YY-YY> */
+            format: string;
+            /**
+             * @description null = nothing issued yet in this series
+             * @example BIAPL/496/26-27
+             */
+            latest_number: string | null;
+            /**
+             * @description null = cannot be formed (e.g. no document prefix)
+             * @example BIAPL/497/26-27
+             */
+            next_number: string | null;
+            /** Format: date-time */
+            last_issued_at: string | null;
+        };
+        AdminNumbering: {
+            company: components["schemas"]["AdminCompanyRow"];
+            /**
+             * @description Current fiscal year (Asia/Kolkata)
+             * @example 2026-27
+             */
+            fiscal_year: string;
+            /** @example BIAPL */
+            doc_prefix: string | null;
+            series: components["schemas"]["NumberingSeries"][];
+        };
+        AdminProfileDto: {
+            /** @example BIAPL */
+            doc_prefix?: string;
+            /** @example 29 */
+            state_code?: string;
+            /** @example 29ABCDE1234F1Z5 */
+            gstin?: string;
+            registered_address?: string;
+            bank_account_name?: string;
+            bank_name?: string;
+            bank_account_no?: string;
+            /** @example HDFC0001234 */
+            bank_ifsc?: string;
+            bank_branch?: string;
+            /** @example Brightech Industrial Automation Pvt Ltd */
+            legal_name?: string;
+            /**
+             * @description null = clear
+             * @example UDYAM-KR-03-0012345
+             */
+            udyam_number?: string | null;
+        };
+        AuthorityRolesDto: {
+            /** @enum {string|null} */
+            customer_return_authority_role?: "PURCHASE" | "ENGINEER" | "SALES" | "STORES_QUALITY" | "EXTERNAL_COORD" | "FINANCE" | "MANAGEMENT" | "SYSTEM_ADMIN" | null;
+            /** @enum {string|null} */
+            supplier_refund_authority_role?: "PURCHASE" | "ENGINEER" | "SALES" | "STORES_QUALITY" | "EXTERNAL_COORD" | "FINANCE" | "MANAGEMENT" | "SYSTEM_ADMIN" | null;
+            /** @enum {string|null} */
+            kpi_signoff_authority_role?: "PURCHASE" | "ENGINEER" | "SALES" | "STORES_QUALITY" | "EXTERNAL_COORD" | "FINANCE" | "MANAGEMENT" | "SYSTEM_ADMIN" | null;
+            /** @enum {string|null} */
+            supplier_return_authority_role?: "PURCHASE" | "ENGINEER" | "SALES" | "STORES_QUALITY" | "EXTERNAL_COORD" | "FINANCE" | "MANAGEMENT" | "SYSTEM_ADMIN" | null;
+        };
+        AdminAuthorisersDto: {
+            /** @description BR-09 decision authorities (CLAIM_DECISION, GOODWILL_APPROVAL, ...) */
+            support?: components["schemas"]["AuthorityConfigDto"][];
+            /** @description BR-10 restricted-grant approvers (FINANCIAL_GRANT, CROSS_COMPANY_GRANT) */
+            mis?: components["schemas"]["AuthorityDto"][];
+            roles?: components["schemas"]["AuthorityRolesDto"];
+        };
+        AdminPoliciesDto: {
+            /** @description Company policy fields (discount, return windows, freight, follow-up, RMA turnaround) */
+            company?: components["schemas"]["CompanyPolicyDto"];
+            /** @description BR-11 invoice trigger, payment-before-closure, advance policy */
+            sales?: components["schemas"]["SalesPolicyDto"];
+        };
+        WorkingDayDto: {
+            /** @description ISO weekday, 1 = Monday .. 7 = Sunday */
+            iso_dow: number;
+            /** @example 09:30 */
+            start_local: string;
+            /** @example 18:30 */
+            end_local: string;
+            /** @example 13:30 */
+            break_start_local?: string | null;
+            /** @example 14:00 */
+            break_end_local?: string | null;
+        };
+        WorkingHoursDto: {
+            /** @description Every working weekday. A weekday not listed is a non-working day. */
+            days: components["schemas"]["WorkingDayDto"][];
+        };
+        AdminHolidayDto: {
+            /** @example 2026-12-25 */
+            holiday_date: string;
+            /** @example Christmas */
+            description: string;
+        };
+        GstRateDto: {
+            /**
+             * @description null = the default row used by every line type without its own row
+             * @enum {string|null}
+             */
+            quote_line_type: "REPAIR_SERVICE" | "MATERIAL" | "LABOUR" | "INSPECTION" | "TESTING" | "EXTERNAL" | "FREIGHT" | "OTHER" | "PRODUCT_SALE" | null;
+            /**
+             * @description Omitted = keep the current HSN/SAC. Required unless PRODUCT_SALE (item HSN applies).
+             * @example 998732
+             */
+            hsn_sac?: string | null;
+            /**
+             * @description IGST %. CGST = SGST = IGST / 2.
+             * @example 18
+             */
+            igst_rate: number;
+        };
+        TestSlaTargetDto: {
+            /** @enum {string} */
+            priority: "NORMAL" | "URGENT" | "CRITICAL";
+            target_amount: number;
+            /** @enum {string} */
+            target_unit: "WORKING_HOUR" | "WORKING_DAY";
         };
     };
     responses: never;
@@ -27614,6 +27987,668 @@ export interface operations {
                 };
             };
             /** @description Requires role: PURCHASE */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminSettingsController_companies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCompanyRow"][];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: SYSTEM_ADMIN */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminSettingsController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCompanySettings"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: SYSTEM_ADMIN */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminSettingsController_numbering: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminNumbering"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: SYSTEM_ADMIN */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminSettingsController_setProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminProfileDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCompanySettings"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: SYSTEM_ADMIN */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminSettingsController_setAuthorisers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminAuthorisersDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCompanySettings"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: SYSTEM_ADMIN */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminSettingsController_setPolicies: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminPoliciesDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCompanySettings"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: SYSTEM_ADMIN */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminSettingsController_setWorkingHours: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkingHoursDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCompanySettings"];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: SYSTEM_ADMIN */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminSettingsController_addHoliday: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminHolidayDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCompanySettings"];
+                };
+            };
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: SYSTEM_ADMIN */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminSettingsController_removeHoliday: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                companyId: string;
+                holidayId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCompanySettings"];
+                };
+            };
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: SYSTEM_ADMIN */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminSettingsController_setGstRate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GstRateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Br08GstRateConfigRow"][];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: SYSTEM_ADMIN */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Referenced record not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AdminSettingsController_setTestSla: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestSlaTargetDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestSlaTarget"][];
+                };
+            };
+            /** @description Validation or business-rule failure (including a malformed :id) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing, invalid or expired access token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Requires role: SYSTEM_ADMIN */
             403: {
                 headers: {
                     [name: string]: unknown;

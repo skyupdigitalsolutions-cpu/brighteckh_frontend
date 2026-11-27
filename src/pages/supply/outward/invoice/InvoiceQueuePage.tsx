@@ -3,19 +3,21 @@
 // config.blocked → 51040: blocked alert + "What's missing" (invoice trigger 11C-07 / product GST rate P-12, both
 // CLIENT-UNCONFIRMED) + empty card. Otherwise the queue: toolbar "n ready · n waiting" + search; columns Order 150 ·
 // Customer grow · Trigger event 220 · Tax regime 140 · Taxable value 140 (right, Data/Number strong) · Status 150.
-// The queue frame's "Example configuration shown" alert is design-only: the REAL config from the API is rendered.
+// Configured (247:51290): neutral alert "Invoice on <TRIGGER> · product GST <n> %" + "Set by System admin in Settings ›
+// Policies and Company & tax." — live values (GET /sales-config for the rate). The frame's "one invoice per dispatch" is
+// not a backend rule (pending decision), so it isn't claimed. G12 / G13 are answered (configured in Settings).
 // API over Figma: the customer city ("· Chennai") isn't on the row (state code only) → name only. Taxable value =
 // invoiceable_taxable_paise for READY rows, else the order's uninvoiced_taxable_paise.
 import { useState } from 'react';
 import { IconAlertTriangle, IconFileInvoice, IconSearch } from '@tabler/icons-react';
-import { enumLabel, formatDayMonth, formatPaise } from '../../../../lib/format';
+import { enumLabel, formatDayMonth, formatPaise, formatQty } from '../../../../lib/format';
 import {
   Badge, EmptyState, ErrorState, InlineAlert, PageContent, PageHeader, Pagination, SearchField, SkeletonRows, StatusPill, errorBody,
 } from '../../../../ui/desktop';
 import { useAuth } from '../../../../auth/AuthProvider';
-import { useInvoiceQueue, type InvoiceQueuePage, type InvoiceQueueRow } from '../../api';
+import { useInvoiceQueue, useSalesConfig, type InvoiceQueuePage, type InvoiceQueueRow } from '../../api';
 import { T } from '../text';
-import { HeadRow, ListCard, ListRow, ListToolbar, OpenQuestion, PanelHead, SplitCard, Td, Th } from '../ui';
+import { HeadRow, ListCard, ListRow, ListToolbar, PanelHead, SplitCard, Td, Th } from '../ui';
 
 const W = { order: 150, trigger: 220, regime: 140, value: 140, status: 150 };
 const PAGE_SIZE = 25;
@@ -26,6 +28,8 @@ export function InvoiceQueuePage() {
   const [page, setPage] = useState(1);
   const q = useInvoiceQueue({ search: search.trim() || undefined, page, page_size: PAGE_SIZE });
   const cfg = q.data?.config;
+  const sales = useSalesConfig();
+  const rate = sales.data?.product_gst_rate?.igst_rate;
 
   return (
     <>
@@ -34,8 +38,8 @@ export function InvoiceQueuePage() {
         {cfg?.blocked ? <BlockedConfig data={q.data!} /> : (
           <>
             {cfg && (
-              <InlineAlert tone="neutral" title="Invoicing configuration">
-                Trigger {cfg.invoice_trigger ?? 'not set'} · product GST rate {cfg.product_gst_rate_configured ? 'configured' : 'not configured'} (set by System admin under Sales policy).
+              <InlineAlert tone="neutral" title={`Invoice on ${cfg.invoice_trigger}${rate ? ` · product GST ${formatQty(rate)} %` : ''}`}>
+                Set by System admin in Settings › Policies and Company & tax. Orders appear here when the trigger event happens.
               </InlineAlert>
             )}
             <ListToolbar>
@@ -115,13 +119,12 @@ function BlockedConfig({ data }: { data: InvoiceQueuePage }) {
   return (
     <>
       <InlineAlert tone="blocked" icon={IconAlertTriangle} title={`Product invoicing is blocked${companyCode ? ` for ${companyCode}` : ''}`}>
-        Both are needed: an invoice trigger (ADVANCE / DISPATCH / DELIVERY) and a product GST rate. {why} System admin sets them under Sales policy.
+        Both are needed: an invoice trigger (ADVANCE / DISPATCH / DELIVERY) and a product GST rate. {why} System admin sets them in Settings › Policies and Company & tax.
       </InlineAlert>
       <SplitCard className="w-full">
         <PanelHead>What's missing</PanelHead>
         <Missing label="Invoice trigger" ok={triggerOk} value={c.invoice_trigger} />
         <Missing label="Product GST rate" ok={c.product_gst_rate_configured} value={c.product_gst_rate_configured ? 'CONFIGURED' : null} />
-        <OpenQuestion code="G12">invoice trigger (11C-07) and product GST rate (P-12) are CLIENT-UNCONFIRMED.</OpenQuestion>
       </SplitCard>
       <ListCard center>
         <EmptyState icon={IconFileInvoice} title="Nothing can be invoiced yet" body="Orders appear here once the company invoice trigger and product GST rate are configured." />

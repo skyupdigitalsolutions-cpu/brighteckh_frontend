@@ -20,7 +20,7 @@ import {
 import { supplyApi, useOrder, useSalesConfig, useSupplyMutation, type OrderDetail } from '../api';
 import { SupplyTabs } from '../ui';
 import { closurePreview, commonUom, isOpenOrder, liveInvoices, sumQty, useOrderContext, type CheckState, type ClosureCheck } from './data';
-import { Bar, Card, CompactInput, H3, KVBox, LockedNote, Muted, OpenQuestion, ReasonStrip, StateBadge } from './ui';
+import { Bar, Card, CompactInput, H3, KVBox, LockedNote, Muted, ReasonStrip, StateBadge } from './ui';
 
 const STATE_TONE: Record<CheckState, Tone> = { PASS: 'success', FAIL: 'blocked', BLOCKED: 'neutral' };
 
@@ -84,7 +84,7 @@ function Closure({ order }: { order: OrderDetail }) {
   const blockReason = !isOpenOrder(order) && !closed
     ? `A ${enumLabel(order.status)} order can't be closed`
     : config.isPending ? 'Loading the closure policy…'
-      : policyBlocked ? 'Closure blocked — payment-before-closure policy not set (11C-09)'
+      : policyBlocked ? 'Closure blocked — payment-before-closure not set (Admin › Settings › Policies)'
         : failed > 0 ? `${failed} ${failed === 1 ? 'check' : 'checks'} failed — fix them, then review again` : null;
 
   const submit = () => {
@@ -109,7 +109,10 @@ function Closure({ order }: { order: OrderDetail }) {
             {!closed && <Muted small>Preview from this order’s quantities and invoices. The server re-checks everything when you close.</Muted>}
             {checks.map((c) => <CheckRow key={c.key} c={c} />)}
             {!closed && policy === null && config.data && (
-              <OpenQuestion>G15 · CLIENT-UNCONFIRMED — payment-before-closure policy is unset, so closure is blocked for every order until System admin sets it (11C-09).</OpenQuestion>
+              <InlineAlert tone="blocked" title="Payment-before-closure isn't set for this company">Closure is blocked until System admin sets it in Admin › Settings › Policies.</InlineAlert>
+            )}
+            {policy !== null && (
+              <LockedNote>{`Payment before closure: ${policy ? 'REQUIRED' : 'NOT REQUIRED'} — Admin › Settings › Policies.`}</LockedNote>
             )}
             {config.isError && <FormErrors error={config.error} title="Couldn't load the closure policy" />}
           </Card>

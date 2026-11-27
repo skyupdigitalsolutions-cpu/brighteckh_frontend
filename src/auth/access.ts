@@ -98,6 +98,8 @@ const NAV: Record<Role, NavItem[]> = {
     // A-D · System admin · Sales policy (247:55207). Figma draws it as the only pill of a new admin shell; it is added to
     // the existing /a shell (BR-10 RBAC admin) instead.
     { to: '/a/sales-policy', label: 'Sales policy', built: true },
+    // AST-D · System admin · Settings (293:59592; top nav 235:940): Company & tax · Authorisers · Policies · Calendar · Numbering.
+    { to: '/a/settings', label: 'Settings', built: true },
   ],
   EXTERNAL_COORD: [],
 };

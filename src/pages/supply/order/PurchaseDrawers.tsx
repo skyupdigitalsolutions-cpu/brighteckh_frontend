@@ -28,7 +28,7 @@ import { formatDate, formatDateTime, formatPaise, formatQty } from '../../../lib
 import { Button, Drawer, FormErrors, GapNote, Ic, InlineAlert, LookupPicker } from '../../../ui/desktop';
 import { employeeSource } from '../../purchase/api';
 import {
-  ADVANCE_KINDS, newIdempotencyKey, supplyApi, useSupplyMutation,
+  ADVANCE_KINDS, newIdempotencyKey, supplyApi, useSalesConfig, useSupplyMutation,
   type AdvanceKind, type Authorisation, type ChangeRequest, type OrderDetail, type OrderLine, type Reservation, type SourcingBody,
 } from '../api';
 import { lineLabel, num, rupeesToPaise, type Item } from './data';
@@ -178,10 +178,25 @@ export function PaymentTermsDrawer({ open, onClose, order, subtitle, onDone }: {
       <EvidenceUpload label="Accepted terms evidence *" prompt="Attach the accepted terms (image or PDF)" evidence={ev} error={tried ? errs.ev : null} />
       <GapNote code="API">Balance terms (e.g. “30 days from invoice”) have no field in the payment-terms API. The order keeps the quote’s payment terms snapshot.</GapNote>
       <InlineAlert tone="neutral" title="If an advance is required">Finance confirms it against a customer payment receipt.</InlineAlert>
-      <OpenQuestion>G16 · CLIENT-UNCONFIRMED — per-order advance policy — whether an advance is mandatory for some customers or order values is not decided. Purchase chooses per order for now.</OpenQuestion>
+      <AdvancePolicyNote />
       <OpenQuestion>G17 · CLIENT-UNCONFIRMED — whether reservation / sourcing must wait until the advance is CONFIRMED, not just recorded. This screen waits for Finance’s confirmation.</OpenQuestion>
       <FormErrors error={m.error} title="The terms weren't saved" />
     </Drawer>
+  );
+}
+
+/** G16 answered: the company advance policy is set by System admin (Settings › Policies); show the live value. */
+function AdvancePolicyNote() {
+  const cfg = useSalesConfig();
+  const p = cfg.data?.policy?.advance_policy ?? null;
+  if (cfg.isPending) return null;
+  return (
+    <InlineAlert tone="neutral" title={`Company advance policy: ${p === 'NONE' ? 'NONE' : p === 'PER_ORDER' ? 'PER ORDER' : 'not set'}`}>
+      {p === 'NONE'
+        ? 'An order with no recorded terms needs no advance; terms you record here still apply.'
+        : 'Record the advance terms on each order before reservation / sourcing.'}
+      {' '}Set by System admin in Admin › Settings › Policies.
+    </InlineAlert>
   );
 }
 
